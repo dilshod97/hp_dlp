@@ -297,6 +297,7 @@ function appLabel(app) {
 function msgContext(e) {
   let t = (e.title || "").replace(/[‎‏‪-‮]/g, "").trim(); // ko'rinmas belgilar
   if (!t) return "";
+  t = t.replace(/^\(\d+\)\s*/, "").trim(); // boshida "(1) " - o'qilmagan xabar soni
   t = t.replace(/\s*[—–-]\s*(Telegram|Google Chrome|Microsoft\s*Edge|Mozilla Firefox|Opera|Brave|Outlook).*$/i, "").trim();
   t = t.replace(/\s*[—–-]?\s*\(\d+\)\s*$/, "").trim(); // "Py – (2)" / "Py (2)" -> "Py"
   return t;
