@@ -1,0 +1,4 @@
+# Barcha platformalarda kerak bo'ladigan kutubxonalar.
+requests==2.32.3
+mss==9.0.2
+Pillow==11.0.0

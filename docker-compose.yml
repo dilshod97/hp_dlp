@@ -1,0 +1,68 @@
+# HP DLP — hamma qismni bitta buyruq bilan ishga tushiradi:
+#   docker compose up --build
+#
+# Xizmatlar:
+#   db       — PostgreSQL ma'lumotlar bazasi
+#   backend  — FastAPI server  (http://localhost:8000, hujjat: /docs)
+#   frontend — React panel      (http://localhost:5173)
+#   agent    — DEMO agent (mock) — panelда jonli ma'lumot ko'rsatish uchun.
+#              Haqiqiy agentlar Windows kompyuterlarda ishlaydi, bu yerda emas.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hpdlp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hpdlp-dev-pass}
+      POSTGRES_DB: ${POSTGRES_DB:-hp_dlp}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hpdlp} -d ${POSTGRES_DB:-hp_dlp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hpdlp}:${POSTGRES_PASSWORD:-hpdlp-dev-pass}@db:5432/${POSTGRES_DB:-hp_dlp}
+      AGENT_API_KEY: ${AGENT_API_KEY:-dev-agent-key-change-me}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      MEDIA_DIR: /app/media
+    volumes:
+      - media_data:/app/media
+    ports:
+      - "8001:8000"          # host 8001 (8000 boshqa loyiha tomonidan band)
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: ""     # same-origin: nginx /api ni backend'ga uzatadi
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  agent:
+    build: ./agent
+    environment:
+      HP_SERVER_URL: http://backend:8000
+      HP_API_KEY: ${AGENT_API_KEY:-dev-agent-key-change-me}
+      HP_FULL_NAME: "Docker demo agent"
+      HP_COLLECTORS: active_window,keyboard,usb,printer,software,files,clipboard,file_monitor,web,telegram,email
+      HP_POLL_INTERVAL_SEC: "5"
+      HP_SCREENSHOT_INTERVAL_SEC: "20"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  media_data:

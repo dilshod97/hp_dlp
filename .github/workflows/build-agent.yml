@@ -1,0 +1,66 @@
+name: Build agent (exe + MSI)
+
+# Windows'siz MSI olish: bu workflow GitHub'ning Windows serverida build qiladi
+# va natijani (exe + msi) "Artifacts" bo'limida yuklab olinadigan qilib beradi.
+# Ishga tushirish: GitHub -> Actions -> "Build agent" -> Run workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versiya (masalan 0.5.0)"
+        required: true
+        default: "0.5.0"
+  push:
+    tags: ["agent-v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Kutubxonalar
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-windows.txt pyinstaller
+
+      - name: config.json tayyorlash
+        shell: pwsh
+        run: |
+          # config.json bo'lmasa, config.example.json dan olinadi (repo'dagi IP/kalit).
+          if (-not (Test-Path config.json)) { Copy-Item config.example.json config.json }
+          Get-Content config.json
+
+      - name: Exe (PyInstaller)
+        run: >
+          pyinstaller --onefile --name hp-dlp-agent --console
+          --hidden-import win32timezone
+          --collect-submodules pynput
+          --collect-submodules watchdog
+          main.py
+
+      - name: config.json ni dist'ga
+        run: copy config.json dist\config.json
+
+      - name: WiX
+        run: dotnet tool install --global wix
+
+      - name: MSI
+        working-directory: agent/packaging
+        run: wix build product.wxs -o hp-dlp-agent.msi
+
+      - name: Natijani yuklash (Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: hp-dlp-agent-${{ github.event.inputs.version || github.ref_name }}
+          path: |
+            agent/dist/hp-dlp-agent.exe
+            agent/packaging/hp-dlp-agent.msi

@@ -1,0 +1,8 @@
+{
+  "server_url": "http://10.42.0.129:8001",
+  "api_key": "dev-agent-key-change-me",
+  "full_name": "Sinov foydalanuvchi",
+  "poll_interval_sec": 5,
+  "screenshot_interval_sec": 60,
+  "enabled_collectors": ["active_window", "keyboard", "usb", "printer", "software", "clipboard", "file_monitor", "web", "screenshot"]
+}

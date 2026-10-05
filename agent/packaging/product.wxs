@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HP DLP agent MSI (WiX v4). build_msi.bat bilan kompilyatsiya qilinadi. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="HP DLP Agent" Manufacturer="HP DLP"
+           Version="0.4.0.0" UpgradeCode="7b2d9f14-0a3e-4c9a-9f2b-2c6a5e1d4a10"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="Yangiroq versiya o'rnatilgan." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="HP-DLP" />
+    </StandardDirectory>
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DATAFOLDER" Name="HP-DLP" />
+    </StandardDirectory>
+
+    <!-- Asosiy exe + avtostart (HKLM Run) -->
+    <ComponentGroup Id="Main" Directory="INSTALLFOLDER">
+      <Component Id="AgentExe">
+        <File Id="AgentExe" Source="..\dist\hp-dlp-agent.exe" KeyPath="yes" />
+        <RegistryValue Root="HKLM"
+          Key="Software\Microsoft\Windows\CurrentVersion\Run"
+          Name="HP-DLP-Agent" Type="string"
+          Value="&quot;[INSTALLFOLDER]hp-dlp-agent.exe&quot;" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- config.json (mavjud bo'lmasa o'rnatiladi) -->
+    <ComponentGroup Id="Config" Directory="DATAFOLDER">
+      <Component Id="ConfigJson" Permanent="no" NeverOverwrite="yes">
+        <File Id="ConfigJson" Source="..\dist\config.json" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="Main" />
+      <ComponentGroupRef Id="Config" />
+    </Feature>
+  </Package>
+</Wix>

@@ -1,0 +1,8 @@
+# Faqat Windows'da kerak bo'ladigan qo'shimcha kutubxonalar.
+# Windows VM yoki haqiqiy Windows'da o'rnating:
+#   pip install -r requirements.txt -r requirements-windows.txt
+pywin32==308
+WMI==1.5.1
+pynput==1.7.7
+psutil==6.1.0
+watchdog==6.0.0
