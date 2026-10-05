@@ -53,6 +53,9 @@ services:
 
   agent:
     build: ./agent
+    # Mac'dagi demo (mock) agent. Odatda ishga tushmaydi — faqat sinov uchun:
+    #   docker compose --profile demo up -d agent
+    profiles: ["demo"]
     environment:
       HP_SERVER_URL: http://backend:8000
       HP_API_KEY: ${AGENT_API_KEY:-dev-agent-key-change-me}

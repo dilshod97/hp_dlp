@@ -67,8 +67,8 @@ def build_collectors(enabled: list[str]) -> tuple[list[Collector], ScreenshotPro
     file_provider: FileProvider | None = None
     if "files" in enabled:
         if IS_WINDOWS:
-            # Haqiqiy fayl monitoringi Bosqich 3'da (watchdog + USB/ulashuv).
-            log.info("Windows'da fayl monitoringi hali qo'shilmagan (Bosqich 3)")
+            from .windows import WindowsFiles
+            file_provider = WindowsFiles()
         else:
             from .mock import MockFiles
             file_provider = MockFiles()

@@ -45,6 +45,19 @@ class Config:
     enabled_collectors: list[str] = field(default_factory=lambda: ["active_window", "screenshot"])
     agent_uid: str = ""
     hostname: str = ""
+    ip_address: str = ""
+
+
+def _local_ip() -> str | None:
+    """Kompyuterning asosiy lokal IP manzilini aniqlaydi."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # paket yubormaydi, faqat marshrutни aniqlaydi
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _load_or_create_uid() -> str:
@@ -104,4 +117,5 @@ def load_config(path: str | None = None) -> Config:
         enabled_collectors=collectors,
         agent_uid=_load_or_create_uid(),
         hostname=socket.gethostname(),
+        ip_address=_local_ip() or "",
     )

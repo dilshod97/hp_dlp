@@ -4,5 +4,5 @@
   "full_name": "Sinov foydalanuvchi",
   "poll_interval_sec": 5,
   "screenshot_interval_sec": 60,
-  "enabled_collectors": ["active_window", "keyboard", "usb", "printer", "software", "clipboard", "file_monitor", "web", "screenshot"]
+  "enabled_collectors": ["active_window", "keyboard", "usb", "printer", "software", "clipboard", "file_monitor", "web", "files", "screenshot"]
 }

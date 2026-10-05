@@ -8,7 +8,7 @@ import string
 import threading
 import time
 
-from .base import Collector, now_iso
+from .base import Collector, FileProvider, now_iso
 
 log = logging.getLogger("agent.windows")
 
@@ -386,25 +386,144 @@ class WindowsFileMonitor(Collector):
 _BROWSERS = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe"}
 
 
-class WindowsWeb(Collector):
-    """Brauzer faol oynasidan tashrif buyurilgan sahifani (sarlavha asosida) qayd etadi.
+_BROWSER_SUFFIXES = [
+    " - Google Chrome", " - Microsoft​ Edge", " - Microsoft Edge", " — Mozilla Firefox",
+    " - Mozilla Firefox", " - Opera", " - Brave", " and 1 more page - Google Chrome",
+]
 
-    To'liq URL olish uchun keyingi bosqichda brauzer kengaytmasi/proksi kerak.
+
+def _clean_site(title: str) -> str:
+    """Brauzer sarlavhasini tozalaydi ('... - Google Chrome' qismini olib tashlaydi)."""
+    t = title.strip()
+    for suf in _BROWSER_SUFFIXES:
+        if t.endswith(suf):
+            t = t[: -len(suf)].strip()
+            break
+    # "... and N more pages" ni olib tashlash
+    import re as _re
+    t = _re.sub(r"\s+and \d+ more pages?$", "", t).strip()
+    return t or title
+
+
+class WindowsWeb(Collector):
+    """Brauzer faol oynasidan tashrif va unда o'tkazilgan vaqtни qayd etadi.
+
+    Faol oynaга o'xshab: sahifa almashganда, oldingi sahifада turган vaqt (duration_sec)
+    yuboriladi. To'liq URL uchun keyingi bosqichда brauzer kengaytmasi kerak.
     """
     name = "web"
 
     def __init__(self):
-        self._last = None
+        self._cur = None       # (app, clean_title)
+        self._since = time.time()
 
     def poll(self) -> list[dict]:
         app, title = _foreground()
-        if app.lower() not in _BROWSERS or not title:
+        is_browser = app.lower() in _BROWSERS and bool(title)
+        key = (app, _clean_site(title)) if is_browser else None
+
+        if key == self._cur:
             return []
-        if title == self._last:
-            return []
-        self._last = title
-        return [{
-            "type": "web", "channel": "web", "severity": "info",
-            "app": app, "title": title,
-            "occurred_at": now_iso(), "details": {},
-        }]
+
+        out = []
+        if self._cur is not None:
+            prev_app, prev_site = self._cur
+            duration = int(time.time() - self._since)
+            if duration >= 2:  # juda qisqa ko'rinishlarni o'tkazib yuborish
+                out.append({
+                    "type": "web", "channel": "web", "severity": "info",
+                    "app": prev_app, "title": prev_site,
+                    "occurred_at": now_iso(), "details": {"duration_sec": duration},
+                })
+        self._cur = key
+        self._since = time.time()
+        return out
+
+
+class WindowsFiles(FileProvider):
+    """Foydalanuvchi papkalarida (Downloads, Desktop, Documents) paydo bo'lgan yoki
+    o'zgargan fayllarni ushlab, serverga yuboradi (DLP tekshiruvi uchun).
+
+    Telegram/brauzerдан yuklab olingan fayllar shu papkalarга tushganда ushlanadi.
+    """
+    name = "files"
+    MAX_SIZE = 10 * 1024 * 1024  # 10 MB dan katta fayllar yuborilmaydi
+    SKIP_EXT = {".tmp", ".crdownload", ".part", ".lnk", ".ini", ".db", ".log"}
+
+    def __init__(self):
+        import collections
+        self._queue = collections.deque(maxlen=500)
+        self._seen: dict[str, tuple] = {}
+        self._lock = threading.Lock()
+        self._start()
+
+    def _start(self):
+        try:
+            import os
+            from watchdog.observers import Observer
+            from watchdog.events import FileSystemEventHandler
+        except ImportError as e:
+            log.error("watchdog yo'q — fayl ushlash ishlamaydi: %s", e)
+            return
+
+        queue, lock = self._queue, self._lock
+
+        class Handler(FileSystemEventHandler):
+            def _enq(self, path):
+                if not path:
+                    return
+                ext = os.path.splitext(path)[1].lower()
+                if ext in WindowsFiles.SKIP_EXT:
+                    return
+                with lock:
+                    queue.append(path)
+
+            def on_created(self, e):
+                if not e.is_directory:
+                    self._enq(e.src_path)
+
+            def on_modified(self, e):
+                if not e.is_directory:
+                    self._enq(e.src_path)
+
+            def on_moved(self, e):
+                if not e.is_directory:
+                    self._enq(getattr(e, "dest_path", None))
+
+        home = os.path.expanduser("~")
+        observer = Observer()
+        count = 0
+        for sub in ("Downloads", "Desktop", "Documents"):
+            path = os.path.join(home, sub)
+            if os.path.isdir(path):
+                observer.schedule(Handler(), path, recursive=True)
+                count += 1
+        observer.daemon = True
+        observer.start()
+        log.info("Fayl ushlash ishga tushdi (%d papka kuzatilmoqda)", count)
+
+    def capture(self):
+        import os
+        import mimetypes
+        while True:
+            with self._lock:
+                if not self._queue:
+                    return None
+                path = self._queue.popleft()
+            try:
+                if not os.path.isfile(path):
+                    continue
+                st = os.stat(path)
+                if st.st_size == 0 or st.st_size > self.MAX_SIZE:
+                    continue
+                sig = (st.st_size, int(st.st_mtime))
+                if self._seen.get(path) == sig:
+                    continue  # shu fayl shu holatда allaqachon yuborilган
+                with open(path, "rb") as f:
+                    data = f.read()
+                self._seen[path] = sig
+                name = os.path.basename(path)
+                mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+                return data, name, mime, "file", path
+            except (OSError, PermissionError):
+                continue  # fayl band yoki o'chirilган — keyingisi

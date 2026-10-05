@@ -28,7 +28,8 @@ def main() -> None:
     os_name = f"{platform.system()} {platform.release()}"
 
     def do_hello() -> bool:
-        return client.hello(cfg.hostname, cfg.full_name, os_name, agent_version=VERSION)
+        return client.hello(cfg.hostname, cfg.full_name, os_name,
+                            ip_address=cfg.ip_address or None, agent_version=VERSION)
 
     registered = do_hello()
 
@@ -69,17 +70,20 @@ def main() -> None:
                     client.send_screenshot(data, app, title)
                 last_screenshot = now
 
-            # 2b) Ushlangan fayl (o'z davrida)
-            if registered and file_provider and now - last_file >= cfg.screenshot_interval_sec:
-                f = file_provider.capture()
-                if f:
+            # 2b) Ushlangan fayllar (har ~8s, bir siklда bir nechta)
+            if registered and file_provider and now - last_file >= 8:
+                for _ in range(10):  # navbatдан 10 tagacha fayl
+                    f = file_provider.capture()
+                    if not f:
+                        break
                     fdata, fname, mime, channel, src = f
                     client.send_file(fdata, fname, mime, channel, src)
                 last_file = now
 
             # 3) Vaqti-vaqti bilan "men tirikman" (har 60s)
             if now - last_hello >= 60:
-                client.hello(cfg.hostname, cfg.full_name, os_name, agent_version=VERSION)
+                client.hello(cfg.hostname, cfg.full_name, os_name,
+                            ip_address=cfg.ip_address or None, agent_version=VERSION)
                 last_hello = now
 
             # 4) Yangilanishni tekshirish (har 1 soat)
