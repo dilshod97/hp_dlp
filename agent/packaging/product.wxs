@@ -2,7 +2,7 @@
 <!-- HP DLP agent MSI (WiX v4). build_msi.bat bilan kompilyatsiya qilinadi. -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="HP DLP Agent" Manufacturer="HP DLP"
-           Version="0.5.0.0" UpgradeCode="7b2d9f14-0a3e-4c9a-9f2b-2c6a5e1d4a10"
+           Version="0.5.1.0" UpgradeCode="7b2d9f14-0a3e-4c9a-9f2b-2c6a5e1d4a10"
            Scope="perMachine">
 
     <MajorUpgrade DowngradeErrorMessage="Yangiroq versiya o'rnatilgan." />

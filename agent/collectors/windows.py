@@ -441,39 +441,38 @@ class WindowsWeb(Collector):
 
 
 class WindowsFiles(FileProvider):
-    """Foydalanuvchi papkalarida (Downloads, Desktop, Documents) paydo bo'lgan yoki
-    o'zgargan fayllarni ushlab, serverga yuboradi (DLP tekshiruvi uchun).
+    """Diskka tushgan (qabul qilingan/yuklab olingan) va USB'ga ko'chirilган fayllarni
+    ushlab, serverga yuboradi (DLP tekshiruvi uchun).
 
-    Telegram/brauzerдан yuklab olingan fayllar shu papkalarга tushganда ushlanadi.
+    Kuzatiladi: foydalanuvchi papkalari (Downloads, Desktop, Documents, Pictures, Videos)
+    va ULANGAN BARCHA USB disklar (yangi ulanganlari ham avtomatik qo'shiladi).
+
+    Shunday qilib: brauzer/Telegram/pochta orqali YUKLAB OLINGAN fayllar va
+    USB'ga KO'CHIRILGAN (chiqarilган) fayllar ushlanadi.
     """
     name = "files"
-    MAX_SIZE = 10 * 1024 * 1024  # 10 MB dan katta fayllar yuborilmaydi
-    SKIP_EXT = {".tmp", ".crdownload", ".part", ".lnk", ".ini", ".db", ".log"}
+    MAX_SIZE = 20 * 1024 * 1024  # 20 MB
+    SKIP_EXT = {".tmp", ".crdownload", ".part", ".lnk", ".ini", ".db", ".log", ".dll", ".sys"}
 
     def __init__(self):
         import collections
-        self._queue = collections.deque(maxlen=500)
+        self._queue = collections.deque(maxlen=1000)
         self._seen: dict[str, tuple] = {}
         self._lock = threading.Lock()
+        self._observer = None
+        self._watched_drives: set[str] = set()
         self._start()
 
-    def _start(self):
-        try:
-            import os
-            from watchdog.observers import Observer
-            from watchdog.events import FileSystemEventHandler
-        except ImportError as e:
-            log.error("watchdog yo'q — fayl ushlash ishlamaydi: %s", e)
-            return
-
+    def _handler(self):
+        from watchdog.events import FileSystemEventHandler
+        import os
         queue, lock = self._queue, self._lock
 
         class Handler(FileSystemEventHandler):
             def _enq(self, path):
                 if not path:
                     return
-                ext = os.path.splitext(path)[1].lower()
-                if ext in WindowsFiles.SKIP_EXT:
+                if os.path.splitext(path)[1].lower() in WindowsFiles.SKIP_EXT:
                     return
                 with lock:
                     queue.append(path)
@@ -490,17 +489,75 @@ class WindowsFiles(FileProvider):
                 if not e.is_directory:
                     self._enq(getattr(e, "dest_path", None))
 
+        return Handler()
+
+    def _start(self):
+        try:
+            import os
+            from watchdog.observers import Observer
+        except ImportError as e:
+            log.error("watchdog yo'q — fayl ushlash ishlamaydi: %s", e)
+            return
+
+        self._observer = Observer()
         home = os.path.expanduser("~")
-        observer = Observer()
-        count = 0
-        for sub in ("Downloads", "Desktop", "Documents"):
+        for sub in ("Downloads", "Desktop", "Documents", "Pictures", "Videos"):
             path = os.path.join(home, sub)
             if os.path.isdir(path):
-                observer.schedule(Handler(), path, recursive=True)
-                count += 1
-        observer.daemon = True
-        observer.start()
-        log.info("Fayl ushlash ishga tushdi (%d papka kuzatilmoqda)", count)
+                try:
+                    self._observer.schedule(self._handler(), path, recursive=True)
+                except Exception:  # noqa: BLE001
+                    pass
+        self._observer.daemon = True
+        self._observer.start()
+        log.info("Fayl ushlash ishga tushdi (papkalar + USB kuzatuvi)")
+
+        # USB disklarni dinamik kuzatish (yangi ulanganini ham)
+        t = threading.Thread(target=self._watch_usb_loop, daemon=True)
+        t.start()
+
+    def _removable_drives(self) -> list[str]:
+        drives = []
+        try:
+            import win32file
+            import string
+            for letter in string.ascii_uppercase:
+                root = f"{letter}:\\"
+                try:
+                    if win32file.GetDriveType(root) == win32file.DRIVE_REMOVABLE and __import__("os").path.exists(root):
+                        drives.append(root)
+                except Exception:  # noqa: BLE001
+                    continue
+        except ImportError:
+            pass
+        return drives
+
+    def _watch_usb_loop(self):
+        import time as _t
+        while True:
+            try:
+                for root in self._removable_drives():
+                    if root not in self._watched_drives and self._observer is not None:
+                        try:
+                            self._observer.schedule(self._handler(), root, recursive=True)
+                            self._watched_drives.add(root)
+                            log.info("USB disk kuzatuvga olindi: %s", root)
+                        except Exception:  # noqa: BLE001
+                            pass
+            except Exception:  # noqa: BLE001
+                pass
+            _t.sleep(8)
+
+    def _channel_for(self, path: str) -> str:
+        """Fayl USB diskdami yoki oddiy papkadami."""
+        try:
+            import win32file
+            root = path[:3]  # "E:\\"
+            if win32file.GetDriveType(root) == win32file.DRIVE_REMOVABLE:
+                return "usb"
+        except Exception:  # noqa: BLE001
+            pass
+        return "file"
 
     def capture(self):
         import os
@@ -524,6 +581,6 @@ class WindowsFiles(FileProvider):
                 self._seen[path] = sig
                 name = os.path.basename(path)
                 mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
-                return data, name, mime, "file", path
+                return data, name, mime, self._channel_for(path), path
             except (OSError, PermissionError):
                 continue  # fayl band yoki o'chirilган — keyingisi
