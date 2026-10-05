@@ -6,7 +6,8 @@ REM Natija: agent\packaging\hp-dlp-agent.msi
 cd /d %~dp0
 
 where wix >nul 2>nul || (
-  echo WiX topilmadi. O'rnating:  dotnet tool install --global wix
+  echo WiX topilmadi. O'rnating:  dotnet tool install --global wix --version 5.0.2
+  echo (WiX v7 litsenziya EULA talab qiladi; v5 talabsiz va product.wxs bilan mos.^)
   exit /b 1
 )
 

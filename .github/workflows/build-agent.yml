@@ -51,7 +51,7 @@ jobs:
         run: copy config.json dist\config.json
 
       - name: WiX
-        run: dotnet tool install --global wix
+        run: dotnet tool install --global wix --version 5.0.2
 
       - name: MSI
         working-directory: agent/packaging
