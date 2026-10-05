@@ -19,7 +19,13 @@ def _base_dir() -> str:
 
 
 def _state_dir() -> str:
-    """Yoziladigan holat papkasi (uid uchun). Windows'da %PROGRAMDATA%\\HP-DLP."""
+    """Yoziladigan holat papkasi (uid, config uchun).
+
+    Frozen (.exe) bo'lsa — exe yonidagi papka (per-user o'rnatishда yoziladi;
+    avtomatik yangilanish shu yerга yoza oladi). Aks holda PROGRAMDATA yoki base.
+    """
+    if getattr(sys, "frozen", False):
+        return _base_dir()
     pd = os.environ.get("PROGRAMDATA")
     if pd:
         d = os.path.join(pd, "HP-DLP")

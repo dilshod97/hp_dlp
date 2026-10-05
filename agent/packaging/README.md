@@ -41,10 +41,13 @@ build_msi.bat
 ```
 Natija: `agent\packaging\hp-dlp-agent.msi`. O'rnatish: `msiexec /i hp-dlp-agent.msi`.
 
-## Qayerda nima
-- Exe: `C:\Program Files\HP-DLP\hp-dlp-agent.exe`
-- Sozlama: `C:\ProgramData\HP-DLP\config.json`
-- agent_uid (barqaror ID): `C:\ProgramData\HP-DLP\.agent_uid`
+## Qayerda nima (per-user o'rnatish)
+- Exe: `%LOCALAPPDATA%\HP-DLP\hp-dlp-agent.exe`
+- Sozlama: `%LOCALAPPDATA%\HP-DLP\config.json`
+- agent_uid (barqaror ID): `%LOCALAPPDATA%\HP-DLP\.agent_uid`
+
+> Foydalanuvchi yoza oladigan papka — shuning uchun **avtomatik yangilanish** (panelдан yangi exe)
+> ishlaydi va o'rnatish uchun admin shart emas.
 
 ## Avtomatik yangilanish (bir marta o'rnatib, keyin avtomatik)
 

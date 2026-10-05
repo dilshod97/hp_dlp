@@ -1,41 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- HP DLP agent MSI (WiX v4). build_msi.bat bilan kompilyatsiya qilinadi. -->
+<!-- HP DLP agent MSI (WiX v4/v5). build_msi.bat bilan kompilyatsiya qilinadi.
+     Per-user o'rnatish: %LOCALAPPDATA%\HP-DLP (foydalanuvchi yoza oladi -> avtomatik yangilanish ishlaydi). -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="HP DLP Agent" Manufacturer="HP DLP"
            Version="0.5.2.0" UpgradeCode="7b2d9f14-0a3e-4c9a-9f2b-2c6a5e1d4a10"
-           Scope="perMachine">
+           Scope="perUser">
 
     <MajorUpgrade DowngradeErrorMessage="Yangiroq versiya o'rnatilgan." />
     <MediaTemplate EmbedCab="yes" />
 
-    <StandardDirectory Id="ProgramFiles64Folder">
+    <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="INSTALLFOLDER" Name="HP-DLP" />
     </StandardDirectory>
-    <StandardDirectory Id="CommonAppDataFolder">
-      <Directory Id="DATAFOLDER" Name="HP-DLP" />
-    </StandardDirectory>
 
-    <!-- Asosiy exe + avtostart (HKLM Run) -->
     <ComponentGroup Id="Main" Directory="INSTALLFOLDER">
+      <!-- exe + har logonда avtomatik ishga tushirish (HKCU Run) -->
       <Component Id="AgentExe">
         <File Id="AgentExe" Source="..\dist\hp-dlp-agent.exe" KeyPath="yes" />
-        <RegistryValue Root="HKLM"
+        <RegistryValue Root="HKCU"
           Key="Software\Microsoft\Windows\CurrentVersion\Run"
           Name="HP-DLP-Agent" Type="string"
           Value="&quot;[INSTALLFOLDER]hp-dlp-agent.exe&quot;" />
       </Component>
-    </ComponentGroup>
-
-    <!-- config.json (mavjud bo'lmasa o'rnatiladi) -->
-    <ComponentGroup Id="Config" Directory="DATAFOLDER">
-      <Component Id="ConfigJson" Permanent="no" NeverOverwrite="yes">
+      <!-- config.json (mavjud bo'lsa ustiga yozilmaydi) -->
+      <Component Id="ConfigJson" NeverOverwrite="yes">
         <File Id="ConfigJson" Source="..\dist\config.json" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
     <Feature Id="Main">
       <ComponentGroupRef Id="Main" />
-      <ComponentGroupRef Id="Config" />
     </Feature>
 
     <!-- O'rnatish bilan darhol ishga tushirish (qayta yuklamasdan) -->
