@@ -66,7 +66,7 @@ def _day_bounds(day: str):
 def list_events(
     limit: int = Query(50, le=200), offset: int = 0,
     severity: str | None = None, type: str | None = None, types: str | None = None,
-    day: str | None = None,
+    day: str | None = None, app: str | None = None,
     session: Session = Depends(get_session),
 ):
     conds = []
@@ -74,6 +74,8 @@ def list_events(
         conds.append(Event.severity == severity)
     if type:
         conds.append(Event.type == type)
+    if app:
+        conds.append(Event.app == app)
     if types:
         wanted = [t.strip() for t in types.split(",") if t.strip()]
         if wanted:
@@ -285,6 +287,16 @@ def app_usage(hours: int = Query(24, le=720), agent_id: int | None = None, sessi
         t["count"] += 1
     out = [{"app": a, "seconds": v["seconds"], "count": v["count"]} for a, v in totals.items()]
     return sorted(out, key=lambda x: -x["seconds"])
+
+
+@router.get("/stats/message-apps")
+def message_apps(session: Session = Depends(get_session)):
+    """Yozishmаларда uchragan dasturlar ro'yxati (filter uchun)."""
+    rows = session.exec(
+        select(Event.app).where(Event.type.in_(["keyboard", "clipboard", "telegram", "email"]),
+                                Event.app.is_not(None)).distinct()
+    ).all()
+    return sorted({a for a in rows if a})
 
 
 @router.get("/stats/site-usage")

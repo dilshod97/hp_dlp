@@ -120,6 +120,7 @@ tr:last-child td { border-bottom: none; }
 .sev.crit { background: var(--crit); } .sev.warn { background: var(--warn); } .sev.info { background: var(--accent); }
 .feed-main { flex: 1; min-width: 0; }
 .feed-title { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.msg-ctx { color: var(--accent); font-weight: 600; }
 .feed-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
 /* Screenshots */

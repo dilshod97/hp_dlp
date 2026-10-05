@@ -284,27 +284,62 @@ export function Screenshots({ amap }) {
 }
 
 // ---------- Yozishmalar (klaviatura, clipboard, telegram, email) ----------
+const APP_NAME = {
+  "telegram.exe": "Telegram", "chrome.exe": "Chrome", "msedge.exe": "Edge",
+  "firefox.exe": "Firefox", "outlook.exe": "Outlook", "code.exe": "VS Code",
+  "excel.exe": "Excel", "winword.exe": "Word", "windowsterminal.exe": "Terminal",
+};
+function appLabel(app) {
+  if (!app) return "—";
+  return APP_NAME[app.toLowerCase()] || app.replace(/\.exe$/i, "");
+}
+// Oyna sarlavhasidan kontekst (kim bilan): "‎Malika – (2)" -> "Malika"
+function msgContext(e) {
+  let t = (e.title || "").replace(/[‎‏‪-‮]/g, "").trim(); // ko'rinmas belgilar
+  if (!t) return "";
+  t = t.replace(/\s*[—–-]\s*(Telegram|Google Chrome|Microsoft\s*Edge|Mozilla Firefox|Opera|Brave|Outlook).*$/i, "").trim();
+  t = t.replace(/\s*[—–-]?\s*\(\d+\)\s*$/, "").trim(); // "Py – (2)" / "Py (2)" -> "Py"
+  return t;
+}
+
 export function Messages({ amap }) {
-  const { items, total, page, setPage, size } = usePaged(
-    (l, o) => api.events(l, o, { types: "keyboard,clipboard,telegram,email" }), { size: 25 });
   const [q, setQ] = useState("");
-  const list = q ? items.filter((e) => `${nm(amap, e.agent_id)} ${e.text || ""} ${e.app || ""}`.toLowerCase().includes(q.toLowerCase())) : items;
+  const [app, setApp] = useState("all");
+  const [apps, setApps] = useState([]);
+  useEffect(() => { api.messageApps().then(setApps).catch(() => {}); }, []);
+  const { items, total, page, setPage, size } = usePaged(
+    (l, o) => api.events(l, o, { types: "keyboard,clipboard,telegram,email", ...(app !== "all" ? { app } : {}) }),
+    { size: 25, deps: [app] });
+  const list = q ? items.filter((e) => `${nm(amap, e.agent_id)} ${e.text || ""} ${e.title || ""} ${appLabel(e.app)}`.toLowerCase().includes(q.toLowerCase())) : items;
+
   return (
     <div className="view">
-      <p className="note">Klaviatura, clipboard, Telegram va e-mail orqali yozilgan matnlar. (Telegram/e-mail — hozircha demo.)</p>
-      <Panel title="Yozishmalar" sub={`${total} ta`} right={<SearchBox value={q} onChange={setQ} />}>
+      <p className="note">Klaviatura, clipboard, Telegram va e-mail orqali yozilgan matnlar. Kontekst = oyna sarlavhasi (masalan Telegram'да kim bilan yozishayotgani).</p>
+      <Panel title="Yozishmalar" sub={`${total} ta`}
+        right={<div className="toolbar">
+          <select className="select" value={app} onChange={(e) => { setApp(e.target.value); setPage(0); }}>
+            <option value="all">Barcha dasturlar</option>
+            {apps.map((a) => <option key={a} value={a}>{appLabel(a)}</option>)}
+          </select>
+          <SearchBox value={q} onChange={setQ} />
+        </div>}>
         {list.length === 0 ? <Empty>Topilmadi</Empty> : (
           <div className="feed">
-            {list.map((e) => (
-              <div className="feed-item" key={e.id}>
-                <span className={`sev ${SEV[e.severity]?.cls || "info"}`} />
-                <div className="feed-main">
-                  <div className="feed-title">{e.text || e.title}</div>
-                  <div className="feed-meta">{nm(amap, e.agent_id)} · {TYPE_LABEL[e.type] || e.type} · {e.app || "—"} · {hhmm(e.occurred_at)}</div>
+            {list.map((e) => {
+              const ctx = msgContext(e);
+              return (
+                <div className="feed-item" key={e.id}>
+                  <span className={`sev ${SEV[e.severity]?.cls || "info"}`} />
+                  <div className="feed-main">
+                    <div className="feed-title">
+                      {ctx && <span className="msg-ctx">{ctx}:</span>} {e.text || e.title}
+                    </div>
+                    <div className="feed-meta">{nm(amap, e.agent_id)} · {appLabel(e.app)} · {TYPE_LABEL[e.type] || e.type} · {hhmm(e.occurred_at)}</div>
+                  </div>
+                  {e.severity === "crit" && <Chip sev="crit">Maxfiy</Chip>}
                 </div>
-                {e.severity === "crit" && <Chip sev="crit">Maxfiy</Chip>}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <Pager page={page} size={size} total={total} onPage={setPage} />

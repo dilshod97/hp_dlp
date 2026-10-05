@@ -31,6 +31,7 @@ export const api = {
   eventTypes: (hours = 24) => req(`/api/v1/stats/event-types?hours=${hours}`),
   appUsage: (agentId, hours = 24) => req(`/api/v1/stats/app-usage?${qs({ hours, agent_id: agentId })}`),
   siteUsage: (agentId, hours = 24) => req(`/api/v1/stats/site-usage?${qs({ hours, agent_id: agentId })}`),
+  messageApps: () => req("/api/v1/stats/message-apps"),
   worktime: (day) => req(`/api/v1/stats/worktime?${qs({ day })}`),
   agents: (limit = 200, offset = 0) => req(`/api/v1/agents?${qs({ limit, offset })}`),
   updateAgent: (id, body) => req(`/api/v1/agents/${id}`, { method: "PATCH", body }),
