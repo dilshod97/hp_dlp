@@ -41,7 +41,7 @@ jobs:
 
       - name: Exe (PyInstaller)
         run: >
-          pyinstaller --onefile --name hp-dlp-agent --console
+          pyinstaller --onefile --name hp-dlp-agent --noconsole
           --hidden-import win32timezone
           --collect-submodules pynput
           --collect-submodules watchdog

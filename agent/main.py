@@ -9,11 +9,32 @@ from core.version import VERSION
 from core import updater
 from collectors.factory import build_collectors
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
+def _setup_logging():
+    """Loglarni faylга yozadi (oynasiz exe uchun) va konsol bo'lsa unga ham."""
+    import os
+    from logging.handlers import RotatingFileHandler
+    handlers = []
+    try:
+        from core.config import _state_dir
+        path = os.path.join(_state_dir(), "agent.log")
+        handlers.append(RotatingFileHandler(path, maxBytes=1_000_000, backupCount=2, encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import sys
+        if sys.stderr is not None:
+            handlers.append(logging.StreamHandler())
+    except Exception:  # noqa: BLE001
+        pass
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        handlers=handlers or None,
+    )
+
+
+_setup_logging()
 log = logging.getLogger("agent")
 
 

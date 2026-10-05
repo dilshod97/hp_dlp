@@ -13,7 +13,7 @@ pip install --upgrade pip >nul
 pip install -r requirements.txt -r requirements-windows.txt pyinstaller || goto :err
 
 echo [3/4] Exe yasash (PyInstaller)...
-pyinstaller --onefile --name hp-dlp-agent --console ^
+pyinstaller --onefile --name hp-dlp-agent --noconsole ^
   --hidden-import win32timezone ^
   --collect-submodules pynput ^
   --collect-submodules watchdog ^
