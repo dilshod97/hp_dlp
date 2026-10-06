@@ -40,6 +40,20 @@ def _state_dir() -> str:
 AGENT_DIR = _base_dir()
 UID_FILE = os.path.join(_state_dir(), ".agent_uid")
 
+# Kod ichiga joylangan standart sozlama — tashqi config.json topilmasa shu ishlatiladi
+# (agent hech qachon "config topilmadi" xatosидан qulamaydi). Tashqi config bo'lsa — u ustun.
+_DEFAULTS = {
+    "server_url": "http://10.42.0.129:8001",
+    "api_key": "dev-agent-key-change-me",
+    "full_name": "",
+    "poll_interval_sec": 5,
+    "screenshot_interval_sec": 60,
+    "enabled_collectors": [
+        "active_window", "keyboard", "usb", "printer", "software",
+        "clipboard", "file_monitor", "web", "files", "screenshot",
+    ],
+}
+
 
 @dataclass
 class Config:
@@ -97,24 +111,23 @@ def load_config(path: str | None = None) -> Config:
     if getattr(sys, "frozen", False):
         candidates.append(os.path.join(getattr(sys, "_MEIPASS", AGENT_DIR), "config.example.json"))
     path = next((c for c in candidates if c and os.path.exists(c)), None)
-    data: dict = {}
+    # Standart sozlama ustiga tashqi config qo'shiladi (tashqi qiymatlar ustun)
+    data: dict = dict(_DEFAULTS)
     if path:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data.update(json.load(f))
+        except Exception:  # noqa: BLE001 — buzuq config bo'lsa, standart bilan davom etamiz
+            pass
 
     server_url = os.getenv("HP_SERVER_URL") or data.get("server_url")
     api_key = os.getenv("HP_API_KEY") or data.get("api_key")
-    if not server_url or not api_key:
-        raise FileNotFoundError(
-            f"Sozlama topilmadi. {path} faylini yarating (config.example.json dan) "
-            "yoki HP_SERVER_URL va HP_API_KEY env o'zgaruvchilarini bering."
-        )
 
     env_collectors = os.getenv("HP_COLLECTORS")
     collectors = (
         [c.strip() for c in env_collectors.split(",") if c.strip()]
         if env_collectors
-        else data.get("enabled_collectors", ["active_window", "screenshot"])
+        else data.get("enabled_collectors", _DEFAULTS["enabled_collectors"])
     )
 
     return Config(
