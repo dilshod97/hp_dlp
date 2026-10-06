@@ -144,6 +144,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:  # noqa: BLE001
-        # Har qanday ishga tushish xatosi agent.log'ga yoziladi (oynasiz exe uchun)
+        # Xato faqat agent.log'ga yoziladi. Foydalanuvchiga OYNA KO'RSATILMAYDI (stealth).
         log.exception("Agent ishga tushishда xato")
-        raise

@@ -492,8 +492,8 @@ def _browser_url() -> str:
         win = auto.ControlFromHandle(hwnd)
         if not win:
             return ""
-        edit = win.EditControl(searchDepth=18)   # birinchi Edit — manzil satri
-        if not edit.Exists(0.3, 0.1):
+        edit = win.EditControl(searchDepth=6)    # manzil satri (sayoz qidiruv — tez)
+        if not edit.Exists(0.12, 0.03):
             return ""
         try:
             val = (edit.GetValuePattern().Value or "").strip()
@@ -581,7 +581,7 @@ def _telegram_texts(hwnd, limit: int = 60) -> list[str]:
     out: list[str] = []
     stack = [(root, 0)]
     visited = 0
-    while stack and visited < 1500:
+    while stack and visited < 800:
         ctrl, depth = stack.pop()
         visited += 1
         try:
@@ -616,44 +616,54 @@ class WindowsTelegram(Collector):
     Shovqinни kamaytirish: faqat Telegram faol oynада bo'lганда, har ~6s, dedup bilан.
     """
     name = "telegram"
-    SCAN_SEC = 6
+    SCAN_SEC = 10
     MAX_SEEN = 800
 
     def __init__(self):
         import collections
-        self._next = 0.0
-        self._seen = collections.deque()    # oxirги ko'rinган xabarlar (dedup tartibi)
+        self._out = collections.deque(maxlen=500)   # tayyor hodisalar (poll shuni oladi)
+        self._lock = threading.Lock()
+        self._seen = collections.deque()            # dedup tartibi
         self._seen_set: set[str] = set()
+        self._start()
+
+    def _start(self):
+        """UI daraxtни kesib o'tish — ALOHIDA OQIMДА (asosiy siklни bloklamaydi)."""
+        t = threading.Thread(target=self._loop, daemon=True)
+        t.start()
+
+    def _loop(self):
+        while True:
+            try:
+                app, title = _foreground()
+                if "telegram" in app.lower():
+                    import win32gui
+                    hwnd = win32gui.GetForegroundWindow()
+                    chat = _re.sub(r"\s*[—\-]\s*Telegram\s*$", "", title or "").strip() or None
+                    for msg in _telegram_texts(hwnd):
+                        if msg in self._seen_set:
+                            continue
+                        self._seen.append(msg)
+                        self._seen_set.add(msg)
+                        if len(self._seen) > self.MAX_SEEN:
+                            old = self._seen.popleft()
+                            self._seen_set.discard(old)
+                        with self._lock:
+                            self._out.append({
+                                "type": "telegram", "channel": "telegram", "severity": "info",
+                                "app": app, "title": chat, "text": msg,
+                                "occurred_at": now_iso(), "details": {"chat": chat, "source": "uia"},
+                            })
+            except Exception as e:  # noqa: BLE001
+                log.debug("telegram skan xato: %s", e)
+            time.sleep(self.SCAN_SEC)
 
     def poll(self) -> list[dict]:
-        now = time.time()
-        if now < self._next:
-            return []
-        app, title = _foreground()
-        if "telegram" not in app.lower():
-            return []
-        self._next = now + self.SCAN_SEC
-        try:
-            import win32gui
-            hwnd = win32gui.GetForegroundWindow()
-        except Exception:  # noqa: BLE001
-            return []
-        chat = _re.sub(r"\s*[—\-]\s*Telegram\s*$", "", title or "").strip() or None
-
-        out = []
-        for msg in _telegram_texts(hwnd):
-            if msg in self._seen_set:
-                continue
-            self._seen.append(msg)
-            self._seen_set.add(msg)
-            if len(self._seen) > self.MAX_SEEN:
-                old = self._seen.popleft()
-                self._seen_set.discard(old)
-            out.append({
-                "type": "telegram", "channel": "telegram", "severity": "info",
-                "app": app, "title": chat, "text": msg,
-                "occurred_at": now_iso(), "details": {"chat": chat, "source": "uia"},
-            })
+        with self._lock:
+            if not self._out:
+                return []
+            out = list(self._out)
+            self._out.clear()
         return out
 
 
@@ -690,6 +700,9 @@ class WindowsFiles(FileProvider):
                 if not path:
                     return
                 if os.path.splitext(path)[1].lower() in WindowsFiles.SKIP_EXT:
+                    return
+                # DLP agentining o'z fayllarini (exe/msi/.new/.old) o'tkazib yuborish
+                if "hp-dlp-agent" in os.path.basename(path).lower():
                     return
                 with lock:
                     queue.append(path)
@@ -860,6 +873,8 @@ class WindowsClipboardFiles(FileProvider):
         if not isinstance(path, str) or not os.path.isfile(path):
             return
         if os.path.splitext(path)[1].lower() in self.SKIP_EXT:
+            return
+        if "hp-dlp-agent" in os.path.basename(path).lower():
             return
         try:
             st = os.stat(path)
