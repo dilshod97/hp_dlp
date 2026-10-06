@@ -168,7 +168,12 @@ class MockFiles(FileProvider):
         name, channel, body = random.choice(self._FILES)
         folders = ["C:/Users/user/Downloads", "C:/Users/user/Documents", "D:/ish"]
         source_path = f"{random.choice(folders)}/{name}"
-        return body.encode("utf-8"), name, "text/plain", channel, source_path
+        return {
+            "data": body.encode("utf-8"), "filename": name, "mime": "text/plain",
+            "channel": channel, "source_path": source_path,
+            "source_url": "https://example.uz/files/" + name,
+            "context_app": "chrome.exe", "context_title": "Namuna sahifa",
+        }
 
 
 class MockClipboard(Collector):

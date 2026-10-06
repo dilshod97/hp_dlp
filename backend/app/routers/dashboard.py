@@ -117,7 +117,8 @@ def open_file(file_id: int, ctx: dict = Depends(require_dashboard), session: Ses
     record(session, ctx.get("u"), "file_view", f.filename)
     session.commit()
     return FileOut(id=f.id, agent_id=f.agent_id, filename=f.filename, url=f"/media/{f.path}",
-                   source_path=f.source_path, size=f.size, mime=f.mime, channel=f.channel,
+                   source_path=f.source_path, source_url=f.source_url, context_app=f.context_app,
+                   context_title=f.context_title, size=f.size, mime=f.mime, channel=f.channel,
                    severity=f.severity, occurred_at=f.occurred_at)
 
 
@@ -125,7 +126,7 @@ def open_file(file_id: int, ctx: dict = Depends(require_dashboard), session: Ses
 def list_files(limit: int = Query(50, le=200), offset: int = 0, session: Session = Depends(get_session)):
     total = _count(session, CapturedFile)
     rows = session.exec(select(CapturedFile).order_by(CapturedFile.occurred_at.desc()).offset(offset).limit(limit)).all()
-    items = [FileOut(id=f.id, agent_id=f.agent_id, filename=f.filename, url=f"/media/{f.path}", source_path=f.source_path, size=f.size, mime=f.mime, channel=f.channel, severity=f.severity, occurred_at=f.occurred_at) for f in rows]
+    items = [FileOut(id=f.id, agent_id=f.agent_id, filename=f.filename, url=f"/media/{f.path}", source_path=f.source_path, source_url=f.source_url, context_app=f.context_app, context_title=f.context_title, size=f.size, mime=f.mime, channel=f.channel, severity=f.severity, occurred_at=f.occurred_at) for f in rows]
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 

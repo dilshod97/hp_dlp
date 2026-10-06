@@ -73,6 +73,9 @@ class FileOut(BaseModel):
     filename: str
     url: str
     source_path: Optional[str] = None
+    source_url: Optional[str] = None
+    context_app: Optional[str] = None
+    context_title: Optional[str] = None
     size: int
     mime: Optional[str]
     channel: Optional[str]

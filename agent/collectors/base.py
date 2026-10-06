@@ -35,6 +35,9 @@ class FileProvider(ABC):
     name: str = "files"
 
     @abstractmethod
-    def capture(self) -> tuple[bytes, str, str, str, str] | None:
-        """(bytes, filename, mime, channel, source_path) yoki None qaytaradi."""
+    def capture(self) -> dict | None:
+        """Lug'at qaytaradi yoki None. Kalitlar:
+        data(bytes), filename, mime, channel, source_path,
+        source_url (ixtiyoriy), context_app (ixtiyoriy), context_title (ixtiyoriy).
+        """
         raise NotImplementedError

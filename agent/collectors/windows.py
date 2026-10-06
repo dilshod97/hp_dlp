@@ -577,6 +577,21 @@ class WindowsFiles(FileProvider):
             pass
         return "file"
 
+    def _zone_url(self, path: str) -> str:
+        """Brauzer yuklaган faylда Windows manba URL'ini saqlaydi (NTFS Zone.Identifier)."""
+        try:
+            host, ref = "", ""
+            with open(path + ":Zone.Identifier", "r", encoding="utf-8", errors="ignore") as z:
+                for line in z:
+                    low = line.strip().lower()
+                    if low.startswith("hosturl="):
+                        host = line.strip().split("=", 1)[1]
+                    elif low.startswith("referrerurl="):
+                        ref = line.strip().split("=", 1)[1]
+            return host or ref
+        except OSError:
+            return ""
+
     def capture(self):
         import os
         import mimetypes
@@ -599,6 +614,12 @@ class WindowsFiles(FileProvider):
                 self._seen[path] = sig
                 name = os.path.basename(path)
                 mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
-                return data, name, mime, self._channel_for(path), path
+                ctx_app, ctx_title = _foreground()
+                return {
+                    "data": data, "filename": name, "mime": mime,
+                    "channel": self._channel_for(path), "source_path": path,
+                    "source_url": self._zone_url(path),
+                    "context_app": ctx_app, "context_title": ctx_title,
+                }
             except (OSError, PermissionError):
                 continue  # fayl band yoki o'chirilган — keyingisi

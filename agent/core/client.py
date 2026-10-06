@@ -73,12 +73,14 @@ class ServerClient:
             log.warning("events yuborilmadi (navbatda %d ta kutmoqda): %s", len(self.queue), e)
 
     def send_file(self, data: bytes, filename: str, mime: str = "application/octet-stream",
-                  channel: str = "", source_path: str = "") -> None:
+                  channel: str = "", source_path: str = "",
+                  source_url: str = "", context_app: str = "", context_title: str = "") -> None:
         try:
             r = self.session.post(
                 f"{self.base}/api/v1/ingest/file",
                 data={"agent_uid": self.agent_uid, "filename": filename, "channel": channel,
-                      "source_path": source_path},
+                      "source_path": source_path, "source_url": source_url,
+                      "context_app": context_app, "context_title": context_title},
                 files={"file": (filename, data, mime)},
                 timeout=30,
             )

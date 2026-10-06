@@ -57,9 +57,12 @@ class CapturedFile(SQLModel, table=True):
     filename: str
     path: str                              # media ichidagi nisbiy yo'l (serverda)
     source_path: Optional[str] = None      # fayl kompyuterda qayerda edi (masalan C:\Users\...\Downloads)
+    source_url: Optional[str] = None       # qayerdan yuklangan (brauzer Zone.Identifier)
+    context_app: Optional[str] = None      # fayl paydo bo'lganда faol dastur (Chrome/Telegram...)
+    context_title: Optional[str] = None    # faol oyna sarlavhasi (Telegram chat nomi / sahifa)
     size: int = 0
     mime: Optional[str] = None
-    channel: Optional[str] = None          # usb, email, telegram, ...
+    channel: Optional[str] = None          # usb, file, ...
     severity: str = Field(default="info")
     occurred_at: datetime = Field(default_factory=utcnow, index=True)
     created_at: datetime = Field(default_factory=utcnow)

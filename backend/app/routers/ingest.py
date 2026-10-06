@@ -129,6 +129,9 @@ async def ingest_file(
     channel: str = Form(default=""),
     severity: str = Form(default="info"),
     source_path: str = Form(default=""),
+    source_url: str = Form(default=""),
+    context_app: str = Form(default=""),
+    context_title: str = Form(default=""),
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
 ):
@@ -160,7 +163,8 @@ async def ingest_file(
 
     cf = CapturedFile(
         agent_id=agent.id, filename=base, path=f"files/{safe_name}",
-        source_path=source_path or None,
+        source_path=source_path or None, source_url=source_url or None,
+        context_app=context_app or None, context_title=context_title or None,
         size=len(content), mime=file.content_type, channel=channel or None, severity=severity,
     )
     session.add(cf)

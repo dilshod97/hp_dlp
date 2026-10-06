@@ -455,6 +455,13 @@ export function FileActivity({ amap }) {
 }
 
 // ---------- Ushlangan fayllar ----------
+function fileOrigin(f) {
+  if (f.source_url) {
+    try { return new URL(f.source_url).hostname || f.source_url; } catch { return f.source_url; }
+  }
+  return [appLabel(f.context_app), f.context_title].filter(Boolean).join(" · ");
+}
+
 export function Files({ amap }) {
   const { items, total, page, setPage, size } = usePaged(api.files, { size: 25 });
   const [open, setOpen] = useState(null);
@@ -467,12 +474,13 @@ export function Files({ amap }) {
         {list.length === 0 ? <Empty>Topilmadi</Empty> : (
           <div className="tbl-wrap">
             <table>
-              <thead><tr><th>Fayl</th><th>Xodim</th><th>Manzil</th><th>Kanal</th><th>Daraja</th><th>Hajm</th><th>Vaqt</th><th></th></tr></thead>
+              <thead><tr><th>Fayl</th><th>Xodim</th><th>Qayerdan / kontekst</th><th>Manzil</th><th>Kanal</th><th>Daraja</th><th>Hajm</th><th>Vaqt</th><th></th></tr></thead>
               <tbody>
                 {list.map((f) => (
                   <tr key={f.id}>
                     <td><b>{f.filename}</b></td>
                     <td>{nm(amap, f.agent_id)}</td>
+                    <td className="snippet-path" title={fileOrigin(f)}>{fileOrigin(f) || "—"}</td>
                     <td className="mono snippet-path" title={f.source_path || ""}>{f.source_path || "—"}</td>
                     <td><Chip sev="info">{f.channel || "—"}</Chip></td>
                     <td>{f.severity === "crit" ? <Chip sev="crit">Maxfiy</Chip> : <span className="muted">—</span>}</td>
@@ -508,7 +516,9 @@ function FileViewer({ file, onClose }) {
     <div className="modal-bg" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head"><h3>{file.filename}</h3><span className="muted">{fmtSize(file.size)} · {file.channel || "—"}</span></div>
-        {file.source_path && <div className="auto-row"><span>Manzil</span><b className="mono">{file.source_path}</b></div>}
+        {file.source_url && <div className="auto-row"><span>Qayerdan (URL)</span><b className="mono">{file.source_url}</b></div>}
+        {(file.context_app || file.context_title) && <div className="auto-row"><span>Kontekst</span><b>{[appLabel(file.context_app), file.context_title].filter(Boolean).join(" · ")}</b></div>}
+        {file.source_path && <div className="auto-row"><span>Manzil (disk)</span><b className="mono">{file.source_path}</b></div>}
         <div className="viewer">
           {isImage && <img src={url} alt={file.filename} />}
           {isText && state === "loading" && <div className="muted">Yuklanmoqda...</div>}

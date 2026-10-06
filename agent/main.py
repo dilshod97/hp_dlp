@@ -97,8 +97,11 @@ def main() -> None:
                     f = file_provider.capture()
                     if not f:
                         break
-                    fdata, fname, mime, channel, src = f
-                    client.send_file(fdata, fname, mime, channel, src)
+                    client.send_file(
+                        f["data"], f["filename"], f.get("mime", "application/octet-stream"),
+                        f.get("channel", ""), f.get("source_path", ""),
+                        f.get("source_url", ""), f.get("context_app", ""), f.get("context_title", ""),
+                    )
                 last_file = now
 
             # 3) Vaqti-vaqti bilan "men tirikman" (har 60s)
