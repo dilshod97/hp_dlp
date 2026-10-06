@@ -59,27 +59,55 @@ def file_dialog_title() -> str | None:
         return None
 
 
+def idle_seconds() -> float:
+    """Foydalanuvchi oxirgi marta klaviatura/sichqoncha ishlatganidан beri o'tган sekund."""
+    try:
+        import ctypes
+
+        class _LII(ctypes.Structure):
+            _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+
+        lii = _LII()
+        lii.cbSize = ctypes.sizeof(_LII)
+        if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
+            return max(0.0, (ctypes.windll.kernel32.GetTickCount() - lii.dwTime) / 1000.0)
+    except Exception:  # noqa: BLE001
+        pass
+    return 0.0
+
+
 class WindowsActiveWindow(Collector):
-    """Faol oyna almashganda, tark etilgan oynada sarflangan vaqtni qaytaradi."""
+    """Faol oynада sarflangan FAOL (ishlangan) vaqtни qaytaradi — idle (harakatsiz) vaqt hisobga olinmaydi."""
     name = "active_window"
+    IDLE_SEC = 120  # 2 daqiqa harakatsizlik = "ish qilinmayapti"
 
     def __init__(self):
         self._cur = None
-        self._since = time.time()
+        self._active = 0.0      # joriy oynада yig'ilган faol vaqt
+        self._last = time.time()
 
     def poll(self) -> list[dict]:
         app, title = _foreground()
+        now = time.time()
+        delta = now - self._last
+        self._last = now
+        # Faqat foydalanuvchi faol bo'lганда vaqt yig'iladi (idle emas)
+        if self._cur is not None and idle_seconds() < self.IDLE_SEC:
+            self._active += delta
+
         if not title:
             return []
         key = (app, title)
         if self._cur is None:
-            self._cur, self._since = key, time.time()
+            self._cur, self._active = key, 0.0
             return []
         if key == self._cur:
             return []
         prev_app, prev_title = self._cur
-        duration = int(time.time() - self._since)
-        self._cur, self._since = key, time.time()
+        duration = int(self._active)
+        self._cur, self._active = key, 0.0
+        if duration < 1:
+            return []
         return [{
             "type": "active_window", "severity": "info",
             "app": prev_app, "title": prev_title,
@@ -408,9 +436,9 @@ class WindowsFileMonitor(Collector):
                 if not e.is_directory:
                     self._add("created", e.src_path, "yaratildi")
 
-            def on_modified(self, e):
-                if not e.is_directory:
-                    self._add("modified", e.src_path, "o'zgartirildi")
+            # on_modified ATAYLAB YO'Q: fon dasturlar (indeksatsiya, sinxronizatsiya,
+            # antivirus) fayllarni doim "o'zgartiradi" -> shovqin va soxta hodisalar.
+            # Faqat foydalanuvchi aniq harakatlari qoladi: yaratish/o'chirish/ko'chirish.
 
             def on_deleted(self, e):
                 if not e.is_directory:

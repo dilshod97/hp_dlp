@@ -4,7 +4,7 @@
 ; Per-user o'rnatish: %LOCALAPPDATA%\HP-DLP (foydalanuvchi yoza oladi -> avtomatik yangilanish ishlaydi, admin shart emas).
 
 #define AppName "HP DLP Agent"
-#define AppVersion "0.6.2"
+#define AppVersion "0.6.3"
 #define ExeName "hp-dlp-agent.exe"
 
 [Setup]

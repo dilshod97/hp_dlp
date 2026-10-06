@@ -24,6 +24,36 @@ function SearchBox({ value, onChange, placeholder }) {
   return <input className="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder || "Qidirish..."} />;
 }
 
+// Qidiruvli ro'yxat (ko'p xodim/dastur uchun) — yozib qidirib tanlaysiz
+function SearchSelect({ options, value, onChange, placeholder }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const cur = options.find((o) => String(o.value) === String(value));
+  const list = options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="combo">
+      <input className="select combo-input" value={open ? q : (cur ? cur.label : "")}
+        placeholder={placeholder || "Qidirish..."}
+        onFocus={() => { setOpen(true); setQ(""); }}
+        onChange={(e) => setQ(e.target.value)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)} />
+      {open && (
+        <div className="combo-list">
+          {list.slice(0, 80).map((o) => (
+            <div key={o.value} className="combo-item"
+              onMouseDown={() => { onChange(o.value); setOpen(false); setQ(""); }}>{o.label}</div>
+          ))}
+          {list.length === 0 && <div className="combo-item muted">Topilmadi</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+const agentOptions = (agents) => [
+  { value: "all", label: "Barcha xodimlar" },
+  ...agents.map((a) => ({ value: String(a.id), label: a.display_name || a.full_name || a.hostname })),
+];
+
 // ---------- Boshqaruv paneli ----------
 export function Overview({ overview, eventTypes, amap }) {
   const o = overview;
@@ -238,10 +268,7 @@ export function AppUsage({ agents }) {
     <div className="view">
       <p className="note">Dasturlarda o'tkazilgan vaqt (so'nggi 24 soat). Jami: {fmtDur(grand)}.</p>
       <Panel title="Dasturlar bo'yicha vaqt" sub={`${rows.length} ta dastur`}
-        right={<select className="select" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-          <option value="all">Barcha xodimlar</option>
-          {agents.map((a) => <option key={a.id} value={a.id}>{name(a)}</option>)}
-        </select>}>
+        right={<SearchSelect options={agentOptions(agents)} value={agentId} onChange={setAgentId} placeholder="Xodim qidirish..." />}>
         {rows.length === 0 ? <Empty>Ma'lumot yo'q</Empty> : (
           <div className="bars">
             {rows.map((r) => (
@@ -271,10 +298,7 @@ export function Screenshots({ amap, agents = [] }) {
     <div className="view">
       <p className="note">Agent oyna almashganда ekran suratini oladi. Kattalashtirish uchun rasmga bosing.</p>
       <Panel title="Skrinshotlar" sub={`${total} ta`}
-        right={<select className="select" value={agentId} onChange={(e) => { setAgentId(e.target.value); setPage(0); }}>
-          <option value="all">Barcha xodimlar</option>
-          {agents.map((a) => <option key={a.id} value={a.id}>{aname(a)}</option>)}
-        </select>}>
+        right={<SearchSelect options={agentOptions(agents)} value={agentId} onChange={(v) => { setAgentId(v); setPage(0); }} placeholder="Xodim qidirish..." />}>
         {items.length === 0 ? <Empty>Hali skrinshot yo'q</Empty> : (
           <>
             <div className="shots">
@@ -346,10 +370,9 @@ export function Messages({ amap }) {
       <p className="note">Klaviatura, clipboard, Telegram va e-mail orqali yozilgan matnlar. Kontekst = oyna sarlavhasi (masalan Telegram'да kim bilan yozishayotgani).</p>
       <Panel title="Yozishmalar" sub={`${total} ta`}
         right={<div className="toolbar">
-          <select className="select" value={app} onChange={(e) => { setApp(e.target.value); setPage(0); }}>
-            <option value="all">Barcha dasturlar</option>
-            {apps.map((a) => <option key={a} value={a}>{appLabel(a)}</option>)}
-          </select>
+          <SearchSelect
+            options={[{ value: "all", label: "Barcha dasturlar" }, ...apps.map((a) => ({ value: a, label: appLabel(a) }))]}
+            value={app} onChange={(v) => { setApp(v); setPage(0); }} placeholder="Dastur qidirish..." />
           <SearchBox value={q} onChange={setQ} />
         </div>}>
         {list.length === 0 ? <Empty>Topilmadi</Empty> : (

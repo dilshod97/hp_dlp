@@ -60,11 +60,13 @@ def main() -> None:
 
     collectors, screenshot, file_providers = build_collectors(cfg.enabled_collectors)
 
-    # Fayl tanlash/yuklash oynasini aniqlovchi (faqat Windows)
+    # Fayl tanlash/yuklash oynasini aniqlovchi + idle (faqat Windows)
     dialog_detector = None
+    idle_fn = lambda: 0.0  # noqa: E731 — Windows bo'lmasa har doim "faol"
     if platform.system() == "Windows" and screenshot is not None:
         try:
             from collectors.windows import file_dialog_title as dialog_detector
+            from collectors.windows import idle_seconds as idle_fn
         except Exception:  # noqa: BLE001
             dialog_detector = None
 
@@ -91,9 +93,9 @@ def main() -> None:
             if registered:
                 client.send_events(events)
 
-            # 2) Skrinshot (o'z davrida)
+            # 2) Skrinshot (o'z davrida) — foydalanuvchi FAOL bo'lganда (idle emas)
             now = time.time()
-            if screenshot and now - last_screenshot >= cfg.screenshot_interval_sec:
+            if screenshot and now - last_screenshot >= cfg.screenshot_interval_sec and idle_fn() < 120:
                 shot = screenshot.capture()
                 if shot:
                     data, app, title = shot
