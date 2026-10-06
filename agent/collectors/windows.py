@@ -33,6 +33,32 @@ def _foreground():
         return "", ""
 
 
+# Fayl tanlash/yuklash oynasi sarlavhasidagi kalit so'zlar (rus/ingliz/o'zbek)
+_DIALOG_KEYWORDS = (
+    "открыт", "выбер", "загруз", "выгруз", "отправ",
+    "open", "upload", "attach", "choose file", "select file", "file upload",
+    "ochish", "tanla", "yuklash", "yubor",
+)
+
+
+def file_dialog_title() -> str | None:
+    """Agar faol oyna 'fayl tanlash/yuklash' muloqot oynasi bo'lsa, uning sarlavhasini qaytaradi.
+
+    Brauzer/Telegram/pochta orqali fayl biriktirganда ochiladigan oynани aniqlaydi —
+    o'sha paytда skrinshot olsak, qaysi fayl tanlanayotgani ko'rinadi.
+    """
+    try:
+        import win32gui
+        hwnd = win32gui.GetForegroundWindow()
+        title = win32gui.GetWindowText(hwnd) or ""
+        low = title.lower()
+        if any(k in low for k in _DIALOG_KEYWORDS):
+            return title
+        return None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 class WindowsActiveWindow(Collector):
     """Faol oyna almashganda, tark etilgan oynada sarflangan vaqtni qaytaradi."""
     name = "active_window"
@@ -337,11 +363,17 @@ class WindowsClipboard(Collector):
 
 
 class WindowsFileMonitor(Collector):
-    """Foydalanuvchi papkalarida (Desktop, Documents, Downloads) fayl o'zgarishini kuzatadi."""
+    """Foydalanuvchi papkalarida (Desktop, Documents, Downloads) fayl o'zgarishini kuzatadi.
+
+    Dedup: bir fayl+harakat qisqa vaqtда (30s) bir marta yoziladi — yuklab olishда
+    takrorlanadigan "o'zgartirildi" signallari birlashtiriladi.
+    """
     name = "file_monitor"
+    DEDUP_SEC = 30
 
     def __init__(self):
         self._buf: list[dict] = []
+        self._last: dict = {}
         self._lock = threading.Lock()
         self._start()
 
@@ -354,11 +386,17 @@ class WindowsFileMonitor(Collector):
             log.error("watchdog yo'q — fayl monitoringi ishlamaydi: %s", e)
             return
 
-        buf, lock = self._buf, self._lock
+        buf, lock, last = self._buf, self._lock, self._last
+        dedup = self.DEDUP_SEC
 
         class Handler(FileSystemEventHandler):
             def _add(self, action, path, uz, sev="info"):
+                key = (path, action)
+                now = time.time()
                 with lock:
+                    if last.get(key) and now - last[key] < dedup:
+                        return  # yaqinda yozilган — takrorlamaymiz
+                    last[key] = now
                     buf.append({
                         "type": "file_monitor", "channel": "file", "severity": sev,
                         "title": f"Fayl {uz}: {os.path.basename(path)}",
@@ -404,23 +442,35 @@ class WindowsFileMonitor(Collector):
 _BROWSERS = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe"}
 
 
-_BROWSER_SUFFIXES = [
-    " - Google Chrome", " - Microsoft​ Edge", " - Microsoft Edge", " — Mozilla Firefox",
-    " - Mozilla Firefox", " - Opera", " - Brave", " and 1 more page - Google Chrome",
-]
+import re as _re
+
+# Brauzer nomi (sarlavha oxirida) — ruscha/inglizcha "profil", "yana N sahifa" bilan
+_BROWSER_TAIL = _re.compile(
+    r"\s*[—\-]\s*(?:Профиль\s*\d+\s*[:：]\s*)?"
+    r"(Google\s*Chrome|Microsoft\s*Edge|Mozilla\s*Firefox|Opera|Brave)\s*$",
+    _re.IGNORECASE,
+)
+# "... и еще N страниц(ы)" / "... and N more pages"
+_MORE_PAGES = _re.compile(r"\s*(?:и еще|and)\s*\d+\s*(?:more pages?|страниц[аы]?|страниц)\s*$", _re.IGNORECASE)
+# oxiridagi " - Поиск" / " - Search"
+_SEARCH_TAIL = _re.compile(r"\s*[—\-]\s*(Поиск|Search)\s*$", _re.IGNORECASE)
 
 
 def _clean_site(title: str) -> str:
-    """Brauzer sarlavhasini tozalaydi ('... - Google Chrome' qismini olib tashlaydi)."""
-    t = title.strip()
-    for suf in _BROWSER_SUFFIXES:
-        if t.endswith(suf):
-            t = t[: -len(suf)].strip()
-            break
-    # "... and N more pages" ni olib tashlash
-    import re as _re
-    t = _re.sub(r"\s+and \d+ more pages?$", "", t).strip()
-    return t or title
+    """Brauzer sarlavhasidan ortiqcha qismlarni olib tashlaydi.
+
+    Masalan: 'masofaviyaudit.uz - Поиск и еще 3 страницы — Профиль 1: Microsoft Edge'
+          -> 'masofaviyaudit.uz'
+    """
+    t = _re.sub(r"[‎‏‪-‮]", "", title or "").strip()
+    prev = None
+    # Takroriy qo'llash: dumlar ketma-ket bo'lishi mumkin
+    while prev != t:
+        prev = t
+        t = _BROWSER_TAIL.sub("", t).strip()
+        t = _MORE_PAGES.sub("", t).strip()
+        t = _SEARCH_TAIL.sub("", t).strip()
+    return t or (title or "").strip()
 
 
 class WindowsWeb(Collector):

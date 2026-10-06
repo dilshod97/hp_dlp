@@ -1,2 +1,2 @@
 """Agent versiyasi. Yangi reliz chiqarganda shu raqamni oshiring."""
-VERSION = "0.5.6"
+VERSION = "0.5.7"
