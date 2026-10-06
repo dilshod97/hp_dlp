@@ -204,6 +204,13 @@ tr:last-child td { border-bottom: none; }
 .viewer pre { margin: 0; font-size: 12.5px; white-space: pre-wrap; word-break: break-word;
   font-family: ui-monospace, Menlo, monospace; }
 
+/* skrinshot kattalashtirish */
+.shot-zoom { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px; max-width: 92vw; max-height: 92vh; display: flex; flex-direction: column; gap: 10px; }
+.shot-zoom img { max-width: 88vw; max-height: 74vh; object-fit: contain; border-radius: 8px;
+  border: 1px solid var(--border); }
+.shot { cursor: zoom-in; }
+
 @media (max-width: 860px) {
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .grid-2 { grid-template-columns: 1fr; }

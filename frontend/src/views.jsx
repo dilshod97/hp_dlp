@@ -258,26 +258,54 @@ export function AppUsage({ agents }) {
   );
 }
 
-// ---------- Skrinshotlar ----------
-export function Screenshots({ amap }) {
-  const { items, total, page, setPage, size } = usePaged(api.screenshots, { size: 24 });
+// ---------- Skrinshotlar (xodim filtri + kattalashtirish) ----------
+export function Screenshots({ amap, agents = [] }) {
+  const [agentId, setAgentId] = useState("all");
+  const [zoom, setZoom] = useState(null);
+  const { items, total, page, setPage, size } = usePaged(
+    (l, o) => api.screenshots(l, o, agentId === "all" ? undefined : Number(agentId)),
+    { size: 24, deps: [agentId] });
+  const aname = (a) => a.display_name || a.full_name || a.hostname;
+
   return (
     <div className="view">
-      <p className="note">Agent oyna almashganda ekran suratini oladi va shu yerda ko'rinadi.</p>
-      {items.length === 0 ? (
-        <Panel><Empty>Hali skrinshot yo'q. (Docker demo agentida o'chirilgan; Mac/Windows agentida yoqilgan.)</Empty></Panel>
-      ) : (
-        <>
-          <div className="shots">
-            {items.map((s) => (
-              <div className="shot" key={s.id}>
-                <img src={mediaUrl(s.url)} alt={s.title || "skrinshot"} loading="lazy" />
-                <div className="shot-meta"><div className="shot-app">{nm(amap, s.agent_id)}</div><div className="shot-time">{s.app || "Ekran"} · {hhmm(s.occurred_at)}</div></div>
-              </div>
-            ))}
+      <p className="note">Agent oyna almashganда ekran suratini oladi. Kattalashtirish uchun rasmga bosing.</p>
+      <Panel title="Skrinshotlar" sub={`${total} ta`}
+        right={<select className="select" value={agentId} onChange={(e) => { setAgentId(e.target.value); setPage(0); }}>
+          <option value="all">Barcha xodimlar</option>
+          {agents.map((a) => <option key={a.id} value={a.id}>{aname(a)}</option>)}
+        </select>}>
+        {items.length === 0 ? <Empty>Hali skrinshot yo'q</Empty> : (
+          <>
+            <div className="shots">
+              {items.map((s) => (
+                <div className="shot" key={s.id} onClick={() => setZoom(s)} style={{ cursor: "zoom-in" }}>
+                  <img src={mediaUrl(s.url)} alt={s.title || "skrinshot"} loading="lazy" />
+                  <div className="shot-meta">
+                    <div className="shot-app">{nm(amap, s.agent_id)}</div>
+                    <div className="shot-time">{s.app || "Ekran"} · {hhmm(s.occurred_at)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Pager page={page} size={size} total={total} onPage={setPage} />
+          </>
+        )}
+      </Panel>
+      {zoom && (
+        <div className="modal-bg" onClick={() => setZoom(null)}>
+          <div className="shot-zoom" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>{nm(amap, zoom.agent_id)}</h3>
+              <span className="muted">{zoom.app || "Ekran"} · {hhmm(zoom.occurred_at)}</span>
+            </div>
+            <img src={mediaUrl(zoom.url)} alt={zoom.title || "skrinshot"} />
+            <div className="modal-actions">
+              <a className="ghost" href={mediaUrl(zoom.url)} target="_blank" rel="noreferrer">Yangi oynada</a>
+              <button className="primary" onClick={() => setZoom(null)}>Yopish</button>
+            </div>
           </div>
-          <Pager page={page} size={size} total={total} onPage={setPage} />
-        </>
+        </div>
       )}
     </div>
   );
@@ -350,6 +378,7 @@ export function Messages({ amap }) {
 }
 
 // ---------- Umumiy: tur bo'yicha hodisalar jadvali ----------
+const ACTION_UZ = { created: "Yaratildi", modified: "O'zgartirildi", deleted: "O'chirildi", moved: "Ko'chirildi" };
 function EventsByType({ amap, types, title, note, cols }) {
   const { items, total, page, setPage, size } = usePaged((l, o) => api.events(l, o, { types }), { size: 25 });
   const [q, setQ] = useState("");
@@ -368,7 +397,7 @@ function EventsByType({ amap, types, title, note, cols }) {
                   <td>{nm(amap, e.agent_id)}</td>
                   <td><Chip sev={e.severity} /></td>
                   <td>{e.title || eventDesc(e)}{e.app && cols.length > 1 ? <div className="sub">{e.app}</div> : null}</td>
-                  {cols.length > 1 && <td className="muted">{e.details?.action || e.channel || "—"}</td>}
+                  {cols.length > 1 && <td className="muted">{ACTION_UZ[e.details?.action] || e.details?.action || e.channel || "—"}</td>}
                 </tr>
               ))}
               {list.length === 0 && <tr><td colSpan={3 + cols.length}><Empty>Topilmadi</Empty></td></tr>}

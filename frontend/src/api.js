@@ -36,7 +36,7 @@ export const api = {
   agents: (limit = 200, offset = 0) => req(`/api/v1/agents?${qs({ limit, offset })}`),
   updateAgent: (id, body) => req(`/api/v1/agents/${id}`, { method: "PATCH", body }),
   events: (limit = 25, offset = 0, extra = {}) => req(`/api/v1/events?${qs({ limit, offset, ...extra })}`),
-  screenshots: (limit = 24, offset = 0) => req(`/api/v1/screenshots?${qs({ limit, offset })}`),
+  screenshots: (limit = 24, offset = 0, agentId) => req(`/api/v1/screenshots?${qs({ limit, offset, agent_id: agentId })}`),
   files: (limit = 25, offset = 0) => req(`/api/v1/files?${qs({ limit, offset })}`),
   detections: (limit = 25, offset = 0) => req(`/api/v1/detections?${qs({ limit, offset })}`),
   getPolicy: () => req("/api/v1/policy"),

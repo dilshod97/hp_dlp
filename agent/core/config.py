@@ -86,13 +86,16 @@ def load_config(path: str | None = None) -> Config:
       HP_SERVER_URL, HP_API_KEY, HP_FULL_NAME, HP_COLLECTORS (vergul bilan),
       HP_POLL_INTERVAL_SEC, HP_SCREENSHOT_INTERVAL_SEC
     """
-    # config.json ni topish: argumentdagi yo'l -> HP_CONFIG env -> exe yoni -> ProgramData
+    # config.json ni topish: argumentdagi yo'l -> HP_CONFIG env -> exe yoni -> state dir
     candidates = [
         path,
         os.environ.get("HP_CONFIG"),
         os.path.join(AGENT_DIR, "config.json"),
         os.path.join(_state_dir(), "config.json"),
     ]
+    # Oxirgi chora: exe ichiga joylangan standart config (yolg'iz exe ham ishlashi uchun)
+    if getattr(sys, "frozen", False):
+        candidates.append(os.path.join(getattr(sys, "_MEIPASS", AGENT_DIR), "config.example.json"))
     path = next((c for c in candidates if c and os.path.exists(c)), None)
     data: dict = {}
     if path:

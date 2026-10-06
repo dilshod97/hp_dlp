@@ -100,9 +100,15 @@ def list_events(
 
 # ---------- Skrinshotlar ----------
 @router.get("/screenshots")
-def list_screenshots(limit: int = Query(40, le=200), offset: int = 0, session: Session = Depends(get_session)):
-    total = _count(session, Screenshot)
-    rows = session.exec(select(Screenshot).order_by(Screenshot.occurred_at.desc()).offset(offset).limit(limit)).all()
+def list_screenshots(limit: int = Query(40, le=200), offset: int = 0,
+                     agent_id: int | None = None, session: Session = Depends(get_session)):
+    base = select(Screenshot)
+    cnt = select(func.count()).select_from(Screenshot)
+    if agent_id:
+        base = base.where(Screenshot.agent_id == agent_id)
+        cnt = cnt.where(Screenshot.agent_id == agent_id)
+    total = session.exec(cnt).one()
+    rows = session.exec(base.order_by(Screenshot.occurred_at.desc()).offset(offset).limit(limit)).all()
     items = [ScreenshotOut(id=s.id, agent_id=s.agent_id, url=f"/media/{s.path}", app=s.app, title=s.title, occurred_at=s.occurred_at) for s in rows]
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 

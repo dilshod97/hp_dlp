@@ -45,6 +45,7 @@ jobs:
           --hidden-import win32timezone
           --collect-submodules pynput
           --collect-submodules watchdog
+          --add-data "config.example.json;."
           main.py
 
       - name: config.json ni dist'ga

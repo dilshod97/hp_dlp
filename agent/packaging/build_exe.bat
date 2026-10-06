@@ -17,6 +17,7 @@ pyinstaller --onefile --name hp-dlp-agent --noconsole ^
   --hidden-import win32timezone ^
   --collect-submodules pynput ^
   --collect-submodules watchdog ^
+  --add-data "config.example.json;." ^
   main.py || goto :err
 
 echo [4/4] config.json ni dist'ga nusxalash (MSI ichiga kiradi)...

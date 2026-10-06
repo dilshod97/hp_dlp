@@ -99,7 +99,7 @@ export default function App() {
     worktime: <WorkTime />,
     web: <WebSites amap={amap} />,
     filemon: <FileActivity amap={amap} />,
-    screenshots: <Screenshots amap={amap} />,
+    screenshots: <Screenshots amap={amap} agents={agents} />,
     messages: <Messages amap={amap} />,
     files: <Files amap={amap} />,
     policy: <PolicyView role={role} />,
