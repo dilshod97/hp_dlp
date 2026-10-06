@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlmodel import Session, select
+from starlette.concurrency import run_in_threadpool
 
 from ..auth import require_agent_key
 from ..config import settings
@@ -12,6 +13,7 @@ from ..database import get_session
 from ..models import Agent, Event, Screenshot, CapturedFile, Policy, Detection, utcnow
 from ..schemas import HelloIn, HelloOut, EventsBatchIn
 from ..detection import scan_text
+from ..ocr import is_image, extract_text
 
 
 def _policy(session: Session) -> Policy:
@@ -150,14 +152,21 @@ async def ingest_file(
     with open(dest, "wb") as out:
         out.write(content)
 
-    # Matnli fayl bo'lsa, mazmunini maxfiy ma'lumotga tekshirish
+    # Mazmunni maxfiy ma'lumotga tekshirish: matnli fayl — to'g'ridan-to'g'ri,
+    # rasm (clipboard rasmi / yuklab olinган rasm) — OCR orqali.
     matches = []
+    via_ocr = False
     is_text = (file.content_type or "").startswith("text/") or base.lower().endswith((".txt", ".csv", ".log", ".json", ".md"))
     if is_text:
         try:
             matches = _scan(session, content.decode("utf-8", errors="ignore"))
         except Exception:  # noqa: BLE001
             matches = []
+    elif is_image(file.content_type, base):
+        ocr_text = await run_in_threadpool(extract_text, content)   # bloklamaslik uchun
+        if ocr_text:
+            matches = _scan(session, ocr_text)
+            via_ocr = True
     if matches:
         severity = "crit"
 
@@ -170,12 +179,15 @@ async def ingest_file(
     session.add(cf)
     if matches:
         session.flush()
+        snippet = "; ".join(m["sample"] for m in matches)[:200]
+        if via_ocr:
+            snippet = f"[OCR] {snippet}"   # rasmдан o'qilganini bildiradi
         session.add(Detection(
             agent_id=agent.id, source="file", ref_id=cf.id,
             kinds=",".join(sorted({m["kind"] for m in matches})),
-            snippet="; ".join(m["sample"] for m in matches)[:200],
+            snippet=snippet,
         ))
     agent.last_seen = utcnow()
     session.add(agent)
     session.commit()
-    return {"saved": safe_name, "size": len(content), "detections": len(matches)}
+    return {"saved": safe_name, "size": len(content), "detections": len(matches), "ocr": via_ocr}

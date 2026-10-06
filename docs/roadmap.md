@@ -33,17 +33,31 @@
 - [x] Ogohlantirish darajasi avtomatik "Yuqori" ga ko'tariladi
 - [x] Barcha ro'yxatlarда sahifalash (pagination) — server + panel
 - [ ] USB/fayl/clipboard orqali chiqishni haqiqiy bloklash (agent enforcement) — keyingi
-- [ ] OCR (rasm ichidagi matnni o'qish) — keyingi
+- [x] OCR (rasm ichidagi matnni o'qish) — backend tesseract (uzb+rus+eng).
+      Ushlangan rasm/skrinshot matni o'qilib DLP skanidan o'tadi; aniqlanса
+      "Maxfiy ma'lumot"да "[OCR]" belgisi bilan chiqadi. tesseract bo'lmasa xato bermaydi
 
 ## Bosqich 3 — Kanallar (asosan TAYYOR)
 - [x] Clipboard nazorati (Windows real + mock) — DLP tekshiruvidan o'tadi
+- [x] Clipboard orqali nusxalangan FAYL/RASM ushlash (v0.5.9) — Explorer'да Ctrl+C
+      qilinган fayl (CF_HDROP) va nusxalangan rasm (CF_DIB) serverga yuboriladi,
+      DLP skanidan o'tadi. Telegram/pochtaga copy-paste teshigini yopadi.
 - [x] Fayl monitoringi (Windows watchdog + mock): yaratish/o'zgartirish/o'chirish/ko'chirish
-- [x] Veb-sayt nazorati (brauzer sarlavhasi asosida; to'liq URL — keyingi)
+- [x] Veb-sayt nazorati (brauzer sarlavhasi asosida)
+- [x] Veb TO'LIQ URL (v0.6.0) — UIAutomation orqali brauzer manzil satridан active tab
+      URL'i o'qiladi (Chrome/Edge/Firefox); tab almashганда o'qiladi (tez emas).
+      Panelда "Tashriflar"да URL havola bo'lib chiqadi. uiautomation yo'q bo'lsa — faqat sarlavha
 - [x] Panelда yangi bo'limlar: Veb-saytlar, Fayl harakatlari; Yozishmalar barcha kanalni ko'rsatadi
 - [x] Barcha matnli kanallar (clipboard/telegram/email/klaviatura) DLP kalit so'z tekshiruvidan o'tadi
-- [~] Telegram/E-mail — hozircha demo (haqiqiy ushlash keyingi bosqich, maxsus integratsiya kerak)
+- [x] Telegram (Desktop) — UIAutomation orqали ko'rinган yozishma o'qiladi (v0.6.1).
+      BEST-EFFORT: Telegram Qt'да chizilgani uchun ba'zi versiyalarда cheklangan;
+      haqiqiy Telegram Desktop'да sinab sozlash kerak. Chiquvchi matn klaviaturaда
+      ham bor; bu kiruvchi/ko'rinган yozishmани qo'shadi. Matn DLP skaniдан o'tadi
+- [i] E-mail — xodimlar webmailга (Chrome) kiradi, desktop Outlook YO'Q. Shuning uchun
+      Outlook COM qurilmaydi; e-mail nazorati "Veb to'liq URL" orqali qamrab olinadi
 - [ ] Fayl-server nazorati (SMB audit)
-- [ ] Veb to'liq URL (brauzer kengaytmasi/proksi)
+- [x] Veb to'liq URL — UIAutomation (manzil satri) orqali bajarildi (v0.6.0).
+      Sahifa MAZMUNI (webmail matni, upload) uchun keyinchalik brauzer kengaytmasi kerak
 
 ## Bosqich 4 — Boshqaruv va xavfsizlik (asosan TAYYOR)
 - [x] Login/parol + rollar: superadmin, admin, operator, auditor

@@ -50,7 +50,7 @@ _DEFAULTS = {
     "screenshot_interval_sec": 60,
     "enabled_collectors": [
         "active_window", "keyboard", "usb", "printer", "software",
-        "clipboard", "file_monitor", "web", "files", "screenshot",
+        "clipboard", "file_monitor", "web", "telegram", "files", "screenshot",
     ],
 }
 

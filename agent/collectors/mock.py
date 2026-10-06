@@ -176,6 +176,37 @@ class MockFiles(FileProvider):
         }
 
 
+class MockClipboardFiles(FileProvider):
+    """Vaqti-vaqti bilan soxta "clipboard orqali nusxalangan fayl" qaytaradi.
+
+    Haqiqiy variantда (Windows) foydalanuvchi faylni Ctrl+C qilib Telegram/pochtaga
+    Ctrl+V qilsa ushlanadi. Bu yerда demo uchun soxta namuna.
+    """
+    name = "clipboard_files"
+    _FILES = [
+        ("maxfiy_eslatma.txt",
+         "MAXFIY\nKlaviatura paroli: Admin#2026\nKarta: 4111 1111 1111 1111"),
+        ("xodimlar.csv",
+         "ism,lavozim,maosh\nAli,bosh mutaxassis,12000000\nVali,auditor,9000000"),
+    ]
+
+    def __init__(self, interval_sec: int = 40):
+        self.interval_sec = interval_sec
+        self._next = time.time() + interval_sec
+
+    def capture(self):
+        if time.time() < self._next:
+            return None
+        self._next = time.time() + self.interval_sec
+        name, body = random.choice(self._FILES)
+        app, title = random.choice(_APPS)
+        return {
+            "data": body.encode("utf-8"), "filename": name, "mime": "text/plain",
+            "channel": "clipboard", "source_path": f"C:/Users/user/Documents/{name}",
+            "source_url": "", "context_app": app, "context_title": title,
+        }
+
+
 class MockClipboard(Collector):
     """Vaqti-vaqti bilan soxta clipboard (nusxa olingan matn) qaytaradi."""
     name = "clipboard"

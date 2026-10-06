@@ -6,3 +6,4 @@ WMI==1.5.1
 pynput==1.7.7
 psutil==6.1.0
 watchdog==6.0.0
+uiautomation==2.0.20

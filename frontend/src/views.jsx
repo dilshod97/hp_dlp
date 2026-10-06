@@ -396,7 +396,12 @@ function EventsByType({ amap, types, title, note, cols }) {
                   <td className="mono">{hhmm(e.occurred_at)}</td>
                   <td>{nm(amap, e.agent_id)}</td>
                   <td><Chip sev={e.severity} /></td>
-                  <td>{e.title || eventDesc(e)}{e.app && cols.length > 1 ? <div className="sub">{e.app}</div> : null}</td>
+                  <td>
+                    {e.title || eventDesc(e)}
+                    {e.details?.url
+                      ? <div className="sub"><a href={e.details.url} target="_blank" rel="noreferrer">{e.details.url}</a></div>
+                      : (e.app && cols.length > 1 ? <div className="sub">{e.app}</div> : null)}
+                  </td>
                   {cols.length > 1 && <td className="muted">{ACTION_UZ[e.details?.action] || e.details?.action || e.channel || "—"}</td>}
                 </tr>
               ))}
@@ -421,7 +426,7 @@ export function WebSites({ amap }) {
   const max = Math.max(1, ...sites.map((s) => s.seconds));
   return (
     <div className="view">
-      <p className="note">Tashrif buyurilgan saytlar va ularда o'tkazilgan vaqt (masalan kun.uz'da qancha). To'liq URL — brauzer kengaytmasi bilan keyingi bosqichда.</p>
+      <p className="note">Tashrif buyurilgan saytlar va ularда o'tkazilgan vaqt (masalan kun.uz'da qancha). "Tashriflar" jadvalida har sahifaning to'liq URL'i ko'rinadi (brauzer manzil satriдан).</p>
       <Panel title="Saytlar bo'yicha vaqt" sub={`${sites.length} ta sayt · so'nggi 24 soat`}>
         {sites.length === 0 ? <Empty>Ma'lumot yo'q</Empty> : (
           <div className="bars">
@@ -787,12 +792,15 @@ const CAPS = [
   { t: "Audit jurnali", s: "ok" }, { t: "Agentni avtomatik yangilash", s: "ok" },
   { t: "Maxfiy ma'lumot aniqlash (kalit so'z, karta, pasport)", s: "ok" },
   { t: "DLP siyosati (kalit so'zlar)", s: "ok" },
-  { t: "Clipboard nazorati", s: "ok" }, { t: "Fayl monitoringi", s: "ok" },
-  { t: "Veb-sayt nazorati (sarlavha)", s: "ok" },
+  { t: "Clipboard nazorati (matn)", s: "ok" }, { t: "Clipboard fayl/rasm ushlash", s: "ok" },
+  { t: "Fayl monitoringi", s: "ok" },
+  { t: "Veb-sayt nazorati (to'liq URL)", s: "ok" },
+  { t: "OCR (rasmdagi matn)", s: "ok" },
   { t: "USB/fayl chiqishini bloklash (enforcement)", s: "plan" },
-  { t: "Veb to'liq URL (kengaytma/proksi)", s: "plan" },
-  { t: "E-mail nazorati (haqiqiy)", s: "plan" }, { t: "Telegram nazorati (haqiqiy)", s: "plan" },
-  { t: "OCR (rasmdagi matn)", s: "plan" }, { t: "Ekran suv belgisi", s: "plan" },
+  { t: "Veb sahifa mazmuni (kengaytma)", s: "plan" },
+  { t: "Telegram nazorati (Desktop, UIA — best-effort)", s: "ok" },
+  { t: "E-mail mazmuni (webmail, kengaytma)", s: "plan" },
+  { t: "Ekran suv belgisi", s: "plan" },
 ];
 const CAP_LABEL = { ok: "Tayyor", plan: "Rejada" };
 

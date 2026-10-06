@@ -45,6 +45,8 @@ jobs:
           --hidden-import win32timezone
           --collect-submodules pynput
           --collect-submodules watchdog
+          --collect-submodules uiautomation
+          --collect-all comtypes
           --add-data "config.example.json;."
           main.py
 

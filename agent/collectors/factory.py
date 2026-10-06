@@ -34,7 +34,8 @@ def _make(name: str) -> Collector | None:
             "clipboard": w.WindowsClipboard,
             "file_monitor": w.WindowsFileMonitor,
             "web": w.WindowsWeb,
-            # telegram, email — haqiqiy ushlash keyingi bosqichда (Windows'da yo'q)
+            "telegram": w.WindowsTelegram,   # Desktop, UIAutomation (best-effort)
+            # email — xodimlar webmail (Chrome) ishlatadi, veb nazorati qamrab oladi
         }
     else:
         from . import mock as m
@@ -54,7 +55,7 @@ def _make(name: str) -> Collector | None:
     return cls() if cls else None
 
 
-def build_collectors(enabled: list[str]) -> tuple[list[Collector], ScreenshotProvider | None, FileProvider | None]:
+def build_collectors(enabled: list[str]) -> tuple[list[Collector], ScreenshotProvider | None, list[FileProvider]]:
     collectors: list[Collector] = []
     for name in enabled:
         if name in _COLLECTOR_NAMES:
@@ -64,17 +65,22 @@ def build_collectors(enabled: list[str]) -> tuple[list[Collector], ScreenshotPro
 
     screenshot = MssScreenshot() if "screenshot" in enabled else None
 
-    file_provider: FileProvider | None = None
+    # Fayl provayderlari: papka/USB kuzatuvi + clipboard orqali nusxalangan fayl/rasm.
+    # Ikkisi ham send_file orqali yuboradi, shuning uchun "files" bilan birga yoqiladi.
+    file_providers: list[FileProvider] = []
     if "files" in enabled:
         if IS_WINDOWS:
-            from .windows import WindowsFiles
-            file_provider = WindowsFiles()
+            from .windows import WindowsFiles, WindowsClipboardFiles
+            file_providers.append(WindowsFiles())
+            file_providers.append(WindowsClipboardFiles())
         else:
-            from .mock import MockFiles
-            file_provider = MockFiles()
+            from .mock import MockFiles, MockClipboardFiles
+            file_providers.append(MockFiles())
+            file_providers.append(MockClipboardFiles())
 
     if not IS_WINDOWS and collectors:
         log.info("Windows emas — kolektorlar uchun MOCK ishlatilmoqda")
-    log.info("Faollashtirilgan kolektorlar: %s + skrinshot=%s + fayllar=%s",
-             [c.name for c in collectors], screenshot is not None, file_provider is not None)
-    return collectors, screenshot, file_provider
+    log.info("Faollashtirilgan kolektorlar: %s + skrinshot=%s + fayl provayderlar=%s",
+             [c.name for c in collectors], screenshot is not None,
+             [p.name for p in file_providers])
+    return collectors, screenshot, file_providers

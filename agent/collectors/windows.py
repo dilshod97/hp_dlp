@@ -473,16 +473,56 @@ def _clean_site(title: str) -> str:
     return t or (title or "").strip()
 
 
-class WindowsWeb(Collector):
-    """Brauzer faol oynasidan tashrif va unда o'tkazilgan vaqtни qayd etadi.
+def _browser_url() -> str:
+    """Faol brauzer oynasining manzil satridan TO'LIQ URLни o'qiydi (UIAutomation).
 
-    Faol oynaга o'xshab: sahifa almashganда, oldingi sahifада turган vaqt (duration_sec)
-    yuboriladi. To'liq URL uchun keyingi bosqichда brauzer kengaytmasi kerak.
+    Chrome/Edge/Firefox'да manzil satri — ValuePattern'ли Edit control. uiautomation
+    kutubxonasi yo'q yoki o'qib bo'lmasa — bo'sh satr (sarlavha baribir yoziladi).
+    Faqat tab almashganда chaqiriladi (tez-tez emas), shuning uchun sekinlik sezilmaydi.
+    """
+    try:
+        import uiautomation as auto
+    except ImportError:
+        return ""
+    try:
+        import win32gui
+        hwnd = win32gui.GetForegroundWindow()
+        if not hwnd:
+            return ""
+        win = auto.ControlFromHandle(hwnd)
+        if not win:
+            return ""
+        edit = win.EditControl(searchDepth=18)   # birinchi Edit — manzil satri
+        if not edit.Exists(0.3, 0.1):
+            return ""
+        try:
+            val = (edit.GetValuePattern().Value or "").strip()
+        except Exception:  # noqa: BLE001
+            return ""
+        # Qidiruv matni (bo'sh yoki nuqtasiz bo'shliqли) — URL emas
+        if not val or (" " in val and "." not in val):
+            return ""
+        # Chrome manzil satri sxemани yashirishi mumkin — to'ldiramiz
+        schemes = ("http://", "https://", "ftp://", "file://", "about:", "chrome:", "edge:")
+        if not val.startswith(schemes) and "." in val.split("/")[0]:
+            val = "https://" + val
+        return val[:1000]
+    except Exception as e:  # noqa: BLE001
+        log.debug("URL o'qilmadi: %s", e)
+        return ""
+
+
+class WindowsWeb(Collector):
+    """Brauzer faol oynasidan tashrif, TO'LIQ URL va unда o'tkazilgan vaqtни qayd etadi.
+
+    Sahifa almashganда oldingi sahifада turган vaqt (duration_sec) va o'sha sahifaning
+    to'liq URL'i (UIAutomation orqali manzil satriдан) yuboriladi.
     """
     name = "web"
 
     def __init__(self):
         self._cur = None       # (app, clean_title)
+        self._cur_url = ""     # joriy tab URL'i (tab almashganда o'qiladi)
         self._since = time.time()
 
     def poll(self) -> list[dict]:
@@ -498,13 +538,122 @@ class WindowsWeb(Collector):
             prev_app, prev_site = self._cur
             duration = int(time.time() - self._since)
             if duration >= 2:  # juda qisqa ko'rinishlarni o'tkazib yuborish
+                details = {"duration_sec": duration}
+                if self._cur_url:
+                    details["url"] = self._cur_url
                 out.append({
                     "type": "web", "channel": "web", "severity": "info",
                     "app": prev_app, "title": prev_site,
-                    "occurred_at": now_iso(), "details": {"duration_sec": duration},
+                    "occurred_at": now_iso(), "details": details,
                 })
         self._cur = key
+        self._cur_url = _browser_url() if key is not None else ""   # yangi tab URL'i
         self._since = time.time()
+        return out
+
+
+# Telegram matnidан tashlab yuboriladigan shovqin (vaqt, umumiy tugma/holat so'zlari)
+_TG_TIME = _re.compile(r"^\d{1,2}:\d{2}(\s*(AM|PM))?$", _re.IGNORECASE)
+_TG_NOISE = {
+    "saved messages", "online", "typing", "typing…", "typing...", "edited",
+    "chat", "search", "settings", "forwarded message", "reply", "forward",
+    "last seen recently", "bot", "channel", "group",
+}
+
+
+def _telegram_texts(hwnd, limit: int = 60) -> list[str]:
+    """Telegram Desktop oynasиdан ko'rinayotган matnlarни (xabarlarни) yig'adi — UIAutomation.
+
+    Telegram Qt'да chizilgani uchun BU BEST-EFFORT: ba'zi versiyalarда matn to'liq
+    o'qiladi, ba'zilarида cheklangan. O'qib bo'lmasa — bo'sh ro'yxat (xato bermaydi).
+    Daraxt kesib o'tish chegaralangan (tugun va chuqurlik bo'yicha) — sekinlashtirmaslik uchun.
+    """
+    try:
+        import uiautomation as auto
+    except ImportError:
+        return []
+    try:
+        root = auto.ControlFromHandle(hwnd)
+    except Exception:  # noqa: BLE001
+        return []
+    if not root:
+        return []
+    out: list[str] = []
+    stack = [(root, 0)]
+    visited = 0
+    while stack and visited < 1500:
+        ctrl, depth = stack.pop()
+        visited += 1
+        try:
+            name = (ctrl.Name or "").strip()
+        except Exception:  # noqa: BLE001
+            name = ""
+        # Xabarга o'xshash matn: kamida 4 belgi va (bo'shliqли yoki uzun)
+        if name and len(name) >= 4 and (" " in name or len(name) >= 10):
+            low = name.lower()
+            if low not in _TG_NOISE and not _TG_TIME.match(name):
+                out.append(name[:2000])
+                if len(out) >= limit:
+                    break
+        if depth < 30:
+            try:
+                for ch in ctrl.GetChildren():
+                    stack.append((ch, depth + 1))
+            except Exception:  # noqa: BLE001
+                pass
+    return out
+
+
+class WindowsTelegram(Collector):
+    """Telegram Desktop oynasидаги ko'rinган yozishmани (xabarlarни) o'qiydi — UIAutomation.
+
+    MUHIM: Telegram boshqalarning xabarlarini o'qish uchun API BERMAYDI va Qt'да
+    chizilgani uchun bu BEST-EFFORT — haqiqiy Telegram Desktop'да sinab sozlash kerak.
+    Chiquvchi (yozilган) matn allaqachon klaviatura kollektorида bor; bu kollektor
+    asosan KIRUVCHI va ko'rinган yozishmани qo'shadi. Matn DLP skaniдан o'tadi —
+    maxfiy so'z/karta/pasport topilса backend avtomatik "Yuqori" darajага ko'taradi.
+
+    Shovqinни kamaytirish: faqat Telegram faol oynада bo'lганда, har ~6s, dedup bilан.
+    """
+    name = "telegram"
+    SCAN_SEC = 6
+    MAX_SEEN = 800
+
+    def __init__(self):
+        import collections
+        self._next = 0.0
+        self._seen = collections.deque()    # oxirги ko'rinган xabarlar (dedup tartibi)
+        self._seen_set: set[str] = set()
+
+    def poll(self) -> list[dict]:
+        now = time.time()
+        if now < self._next:
+            return []
+        app, title = _foreground()
+        if "telegram" not in app.lower():
+            return []
+        self._next = now + self.SCAN_SEC
+        try:
+            import win32gui
+            hwnd = win32gui.GetForegroundWindow()
+        except Exception:  # noqa: BLE001
+            return []
+        chat = _re.sub(r"\s*[—\-]\s*Telegram\s*$", "", title or "").strip() or None
+
+        out = []
+        for msg in _telegram_texts(hwnd):
+            if msg in self._seen_set:
+                continue
+            self._seen.append(msg)
+            self._seen_set.add(msg)
+            if len(self._seen) > self.MAX_SEEN:
+                old = self._seen.popleft()
+                self._seen_set.discard(old)
+            out.append({
+                "type": "telegram", "channel": "telegram", "severity": "info",
+                "app": app, "title": chat, "text": msg,
+                "occurred_at": now_iso(), "details": {"chat": chat, "source": "uia"},
+            })
         return out
 
 
@@ -673,3 +822,119 @@ class WindowsFiles(FileProvider):
                 }
             except (OSError, PermissionError):
                 continue  # fayl band yoki o'chirilган — keyingisi
+
+
+class WindowsClipboardFiles(FileProvider):
+    """Clipboard orqali NUSXALANGAN fayl (CF_HDROP) va RASM (CF_DIB) ni ushlaydi.
+
+    Foydalanuvchi Explorer'да faylni Ctrl+C qilib, Telegram/pochta/chat oynasiga
+    Ctrl+V qilsa — WindowsFiles (papka/USB kuzatuvi) buni KO'RMAYDI, chunki fayl
+    diskда yangi joyда paydo bo'lmaydi. Shu provider clipboarddagi faylni/rasmни
+    o'qib, DLP tekshiruvi uchun serverga yuboradi.
+
+    Kanal = "clipboard". Kontekst = nusxa olingan paytdagi faol oyna.
+    O'zgarishni arzon aniqlash uchun GetClipboardSequenceNumber ishlatiladi.
+    """
+    name = "clipboard_files"
+    MAX_SIZE = WindowsFiles.MAX_SIZE
+    SKIP_EXT = WindowsFiles.SKIP_EXT
+
+    def __init__(self):
+        import collections
+        self._queue = collections.deque(maxlen=200)
+        self._last_seq = -1
+        self._seen: dict[str, tuple] = {}   # fayl path -> (size, mtime)
+        self._last_img_hash = ""
+
+    def _seq(self) -> int:
+        """Clipboard versiya raqami — har o'zgarishда ortadi (arzon tekshiruv)."""
+        try:
+            import ctypes
+            return int(ctypes.windll.user32.GetClipboardSequenceNumber())
+        except Exception:  # noqa: BLE001
+            return -1
+
+    def _enqueue_file(self, path: str):
+        import os
+        import mimetypes
+        if not isinstance(path, str) or not os.path.isfile(path):
+            return
+        if os.path.splitext(path)[1].lower() in self.SKIP_EXT:
+            return
+        try:
+            st = os.stat(path)
+        except OSError:
+            return
+        if st.st_size == 0 or st.st_size > self.MAX_SIZE:
+            return
+        sig = (st.st_size, int(st.st_mtime))
+        if self._seen.get(path) == sig:
+            return  # shu fayl shu holatда allaqachon yuborilган
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+        except (OSError, PermissionError):
+            return
+        self._seen[path] = sig
+        name = os.path.basename(path)
+        mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        ctx_app, ctx_title = _foreground()
+        self._queue.append({
+            "data": data, "filename": name, "mime": mime,
+            "channel": "clipboard", "source_path": path, "source_url": "",
+            "context_app": ctx_app, "context_title": ctx_title,
+        })
+
+    def _enqueue_image(self, img):
+        import io
+        import time as _t
+        import hashlib
+        try:
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="PNG")
+            data = buf.getvalue()
+        except Exception as e:  # noqa: BLE001
+            log.debug("clipboard rasm saqlanmadi: %s", e)
+            return
+        if not data or len(data) > self.MAX_SIZE:
+            return
+        h = hashlib.sha256(data).hexdigest()
+        if h == self._last_img_hash:
+            return  # xuddi shu rasm allaqachon yuborilган
+        self._last_img_hash = h
+        name = _t.strftime("clipboard_%Y%m%d_%H%M%S.png")
+        ctx_app, ctx_title = _foreground()
+        self._queue.append({
+            "data": data, "filename": name, "mime": "image/png",
+            "channel": "clipboard", "source_path": "(clipboard)", "source_url": "",
+            "context_app": ctx_app, "context_title": ctx_title,
+        })
+
+    def _scan(self):
+        """Clipboard o'zgarган bo'lsa — fayl(lar)ni yoki rasmni navbatга qo'yadi."""
+        try:
+            from PIL import ImageGrab
+        except ImportError:
+            return
+        try:
+            obj = ImageGrab.grabclipboard()
+        except Exception as e:  # noqa: BLE001
+            log.debug("clipboard grab xato: %s", e)
+            return
+        if isinstance(obj, list):            # CF_HDROP — nusxalangan fayllar ro'yxati
+            for path in obj:
+                self._enqueue_file(path)
+        elif obj is not None and hasattr(obj, "save"):  # CF_DIB — rasm (PIL Image)
+            self._enqueue_image(obj)
+
+    def capture(self):
+        seq = self._seq()
+        if seq != self._last_seq:
+            self._last_seq = seq
+            try:
+                self._scan()
+            except Exception as e:  # noqa: BLE001
+                log.debug("clipboard_files scan xato: %s", e)
+        if self._queue:
+            return self._queue.popleft()
+        return None

@@ -4,3 +4,5 @@ sqlmodel==0.0.22
 pydantic-settings==2.6.1
 python-multipart==0.0.17
 psycopg2-binary==2.9.10
+Pillow==11.0.0
+pytesseract==0.3.13
